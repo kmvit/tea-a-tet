@@ -1,0 +1,207 @@
+/* Дополнительные стили для Wizard: мягкие цвета и минимализм */
+.wizard-page {
+  background: radial-gradient(1200px 600px at 10% 10%, #f4f7ff 0%, #f8fafc 40%, #f3f6fb 100%);
+  color: #1f2937;
+}
+
+.wizard-loading {
+  background: radial-gradient(900px 500px at 20% 10%, #f4f7ff 0%, #f5f7fb 45%, #f1f5f9 100%);
+}
+
+.wizard-card {
+  background: #ffffff;
+  border: 1px solid #e7edf5;
+  border-radius: 24px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.wizard-card h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #1f2937;
+}
+
+.wizard-card h3 {
+  font-weight: 600;
+  color: #334155;
+}
+
+.wizard-section {
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 16px;
+}
+
+.wizard-frame-card {
+  background: #ffffff;
+  border: 1px solid #e9eef6;
+  border-radius: 16px;
+}
+
+.wizard-callout {
+  background: #f1f5ff;
+  border-left: 3px solid #b6c9ff;
+  border-radius: 12px;
+  color: #3b5b9a;
+}
+
+.wizard-error {
+  background: #fff5f5;
+  border-left: 3px solid #f2b4b4;
+  border-radius: 12px;
+  color: #9b2c2c;
+}
+
+.wizard-page input,
+.wizard-page select,
+.wizard-page textarea {
+  background: #ffffff;
+  border: 1px solid #d7dee7;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.wizard-page input.border-red-500,
+.wizard-page input.border-red-600,
+.wizard-page select.border-red-500,
+.wizard-page select.border-red-600,
+.wizard-page textarea.border-red-500,
+.wizard-page textarea.border-red-600 {
+  border-color: #ef4444;
+}
+
+.wizard-page input:focus,
+.wizard-page select:focus,
+.wizard-page textarea:focus {
+  border-color: #a8bfff;
+  box-shadow: 0 0 0 4px rgba(168, 191, 255, 0.35);
+  outline: none;
+}
+
+.wizard-button-primary {
+  background: linear-gradient(180deg, #7b9dff 0%, #6b8ff3 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 18px rgba(59, 99, 203, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.wizard-button-primary:hover {
+  background: linear-gradient(180deg, #86a6ff 0%, #7396f5 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(59, 99, 203, 0.26);
+}
+
+.wizard-button-primary:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  box-shadow: none;
+  transform: none;
+}
+
+.wizard-button-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.wizard-button-secondary:hover {
+  background: #e9eff7;
+  transform: translateY(-1px);
+}
+
+.wizard-button-add {
+  background: linear-gradient(180deg, #9ad2b5 0%, #7fbea1 100%);
+  color: #0f2f22;
+  border-radius: 12px;
+  box-shadow: 0 10px 18px rgba(16, 107, 77, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.wizard-button-add:hover {
+  background: linear-gradient(180deg, #a6dbc1 0%, #88c4a8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(16, 107, 77, 0.22);
+}
+
+/* Шапка и подвал */
+.site-header {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #e7edf5;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #1f2937;
+  text-decoration: none;
+}
+
+.site-logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8bb0ff 0%, #a3d7c0 100%);
+  box-shadow: 0 8px 16px rgba(92, 128, 220, 0.25);
+}
+
+.site-logo-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.site-logo-subtitle {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.site-nav-link {
+  color: #475569;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.5rem 0.85rem;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.site-nav-link:hover {
+  background: #f1f5ff;
+  color: #3b5b9a;
+  border-color: #dbe5ff;
+}
+
+.site-nav-link--active {
+  background: #edf2ff;
+  color: #3b5b9a;
+  border-color: #c9d7ff;
+  font-weight: 600;
+}
+
+.site-footer {
+  background: #1e293b;
+  border-top: 1px solid #334155;
+}
+
+.site-footer-title {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.site-footer-text {
+  color: #94a3b8;
+}
+
+.site-footer-link {
+  color: #cbd5e1;
+  transition: color 0.2s ease;
+}
+
+.site-footer-link:hover {
+  color: #a8bfff;
+}
