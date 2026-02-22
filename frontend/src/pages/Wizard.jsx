@@ -313,8 +313,10 @@ export const Wizard = () => {
         passepartout_width: null,
         work_id: null,
       };
-      setFrames([...frames, newFrame]);
+      const newFrames = [...frames, newFrame];
+      setFrames(newFrames);
       setBaguetteSearches([...baguetteSearches, '']);
+      updateOrderData({ frames: newFrames });
     }
   };
 
