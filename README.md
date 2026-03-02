@@ -23,12 +23,27 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 # Зависимости
 pip install -r requirements.txt
 
+# Переменные окружения (скопируйте и при необходимости измените)
+cp .env.example .env
+
 # Миграции
 python manage.py migrate
 
 # Суперпользователь (опционально, для админки)
 python manage.py createsuperuser
 ```
+
+### Переменные окружения (.env)
+
+Файл `.env` содержит настройки Django. Скопируйте `.env.example` в `.env` и при необходимости измените:
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `SECRET_KEY` | Секретный ключ Django | (встроенный dev-ключ) |
+| `DEBUG` | Режим отладки | `True` |
+| `ALLOWED_HOSTS` | Разрешённые хосты (через запятую) | `localhost,127.0.0.1` |
+| `DATABASE_PATH` | Путь к SQLite | `db.sqlite3` |
+| `CORS_ALLOWED_ORIGINS` | CORS-источники (через запятую) | `http://localhost:3000,...` |
 
 ### 2. Установка frontend
 
