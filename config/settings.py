@@ -155,6 +155,14 @@ CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()
 
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF — доверенные origins для форм (админка и т.д.)
+# Формат: https://домен.ru,http://домен.ru
+_csrf_origins = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000'
+)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
