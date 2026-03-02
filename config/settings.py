@@ -11,15 +11,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-
-from dotenv import load_dotenv
 import os
-
-# Загрузка переменных из .env
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Загрузка переменных из .env (явный путь — важно для systemd/gunicorn)
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -162,6 +161,14 @@ _csrf_origins = os.getenv(
     'http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000'
 )
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+
+# Автодобавление origins из ALLOWED_HOSTS (для production, когда за nginx)
+for host in ALLOWED_HOSTS:
+    if host and host not in ('localhost', '127.0.0.1'):
+        for scheme in ('https://', 'http://'):
+            origin = f'{scheme}{host}'
+            if origin not in CSRF_TRUSTED_ORIGINS:
+                CSRF_TRUSTED_ORIGINS.append(origin)
 
 # REST Framework settings
 REST_FRAMEWORK = {
