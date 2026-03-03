@@ -64,11 +64,19 @@ export const OrderProvider = ({ children }) => {
 
   const calculateCurrentPrice = useCallback(async () => {
     try {
+      // Определяем валидные x1, x2 (глобальные или из первой рамы)
+      const x1 = orderData.x1 ?? orderData.frames?.[0]?.x1;
+      const x2 = orderData.x2 ?? orderData.frames?.[0]?.x2;
+      const x1Val = parseFloat(x1);
+      const x2Val = parseFloat(x2);
+      if (!x1 || !x2 || isNaN(x1Val) || isNaN(x2Val) || x1Val <= 0 || x2Val <= 0) {
+        return null;
+      }
+
       // Преобразуем данные для отправки на бэкенд
-      // Отправляем массив рамок, если он есть
       const dataToSend = {
-        x1: orderData.x1,
-        x2: orderData.x2,
+        x1: x1Val,
+        x2: x2Val,
         glass_id: orderData.glass_id,
         backing_id: orderData.backing_id,
         hardware_id: orderData.hardware_id,
@@ -84,9 +92,13 @@ export const OrderProvider = ({ children }) => {
         stretch_id: orderData.stretch_id,
       };
       
-      // Если есть массив рамок, отправляем его
+      // Если есть массив рамок, отправляем его (с валидными размерами в каждой раме)
       if (orderData.frames && orderData.frames.length > 0) {
-        dataToSend.frames = orderData.frames;
+        dataToSend.frames = orderData.frames.map((f) => ({
+          ...f,
+          x1: f.x1 ?? x1Val,
+          x2: f.x2 ?? x2Val,
+        }));
       } else {
         // Обратная совместимость: если нет массива, но есть старые поля
         if (orderData.baguette_id) {
@@ -101,7 +113,8 @@ export const OrderProvider = ({ children }) => {
       setPriceCalculation(response.data);
       return response.data;
     } catch (error) {
-      console.error('Ошибка расчета цены:', error);
+      const msg = error.response?.data?.error || error.message;
+      console.error('Ошибка расчета цены:', msg, error.response?.data);
       return null;
     }
   }, [orderData]);
