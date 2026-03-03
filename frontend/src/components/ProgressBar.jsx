@@ -1,7 +1,7 @@
 import { useOrder } from '../context/OrderContext';
 
 const steps = [
-  { number: 1, name: 'Размеры и багет' },
+  { number: 1, name: 'Рама, паспарту, молдинг' },
   { number: 2, name: 'Стекло и подрамник' },
   { number: 3, name: 'Доп. опции' },
   { number: 4, name: 'Фурнитура' },

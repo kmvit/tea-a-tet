@@ -25,6 +25,7 @@ export const OrderProvider = ({ children }) => {
         baguette_image: null,
         baguette_width: null,
         passepartout_id: null,
+        passepartout_image: null,
         passepartout_length: null,
         passepartout_width: null,
         work_id: null,

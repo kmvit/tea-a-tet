@@ -7,6 +7,13 @@ class Baguette(models.Model):
     barcode = models.CharField('Штрихкод', max_length=100, blank=True, null=True)
     width = models.DecimalField('Ширина (м)', max_digits=6, decimal_places=2)
     price = models.DecimalField('Цена за метр (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (м)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в метрах. Списывается при каждом заказе.'
+    )
     image = models.ImageField('Фото', upload_to='baguettes/', blank=True, null=True)
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
@@ -23,6 +30,13 @@ class Glass(models.Model):
     """Модель стекла"""
     name = models.CharField('Название', max_length=200)
     price_per_sqm = models.DecimalField('Цена за кв.м (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (кв.м)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в кв.м. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -38,6 +52,13 @@ class Backing(models.Model):
     """Модель подкладки"""
     name = models.CharField('Название', max_length=200)
     price = models.DecimalField('Цена (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -53,6 +74,13 @@ class Hardware(models.Model):
     """Модель фурнитуры"""
     name = models.CharField('Название', max_length=200)
     price_per_unit = models.DecimalField('Цена за штуку (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -69,6 +97,13 @@ class Podramnik(models.Model):
     name = models.CharField('Название', max_length=200)
     price = models.DecimalField('Цена (руб)', max_digits=10, decimal_places=2)
     consumption = models.DecimalField('Расход (м)', max_digits=10, decimal_places=2, default=0)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -84,6 +119,14 @@ class Passepartout(models.Model):
     """Модель паспарту"""
     name = models.CharField('Название', max_length=200)
     price = models.DecimalField('Цена (руб)', max_digits=10, decimal_places=2, default=0)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках (листах). Списывается при каждом заказе.'
+    )
+    image = models.ImageField('Фото', upload_to='passepartout/', blank=True, null=True)
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -99,6 +142,13 @@ class Material(models.Model):
     """Модель материалов"""
     name = models.CharField('Название', max_length=200)
     price = models.DecimalField('Цена (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -114,6 +164,13 @@ class Package(models.Model):
     """Модель упаковки"""
     name = models.CharField('Название', max_length=200)
     price = models.DecimalField('Цена (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -129,6 +186,13 @@ class Molding(models.Model):
     """Модель молдинга"""
     name = models.CharField('Название', max_length=200)
     price_per_meter = models.DecimalField('Цена за метр (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (м)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в метрах. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -144,6 +208,13 @@ class Trosik(models.Model):
     """Модель тросика"""
     name = models.CharField('Название', max_length=200)
     price_per_meter = models.DecimalField('Цена за метр (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (м)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в метрах. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -159,6 +230,13 @@ class Podveski(models.Model):
     """Модель подвесок"""
     name = models.CharField('Название', max_length=200)
     price_per_unit = models.DecimalField('Цена за штуку (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (шт)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:
@@ -174,6 +252,13 @@ class Stretch(models.Model):
     """Модель натяжки"""
     name = models.CharField('Название', max_length=200)
     price_per_sqm = models.DecimalField('Цена за кв.м (руб)', max_digits=10, decimal_places=2)
+    stock_quantity = models.DecimalField(
+        'Количество на складе (кв.м)',
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Фактическое наличие на складе в кв.м. Списывается при каждом заказе.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:

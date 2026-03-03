@@ -9,7 +9,7 @@ from .models import (
     Baguette, Glass, Backing, Hardware, Podramnik, Package,
     Molding, Trosik, Podveski, Passepartout, Stretch, Work
 )
-from .services import PriceCalculator
+from .services import PriceCalculator, StockDeduction
 from orders.models import Order
 
 
@@ -160,10 +160,14 @@ def get_passepartout(request):
     passepartout_list = Passepartout.objects.all()
     data = []
     for passepartout in passepartout_list:
+        image_url = None
+        if passepartout.image:
+            image_url = request.build_absolute_uri(passepartout.image.url)
         data.append({
             'id': passepartout.pk,
             'name': passepartout.name,
             'price': float(passepartout.price),
+            'image': image_url,
         })
     return Response(data)
 
@@ -556,6 +560,19 @@ def create_order_api(request):
         
         # Создаем заказ
         order = Order.objects.create(**order_data)
+
+        # Списание материалов со склада
+        deduct_data = dict(order_data)
+        if data.get('stretch_id'):
+            deduct_data['stretch_id'] = data['stretch_id']
+        try:
+            StockDeduction.deduct_from_order(deduct_data, frames or [])
+        except Exception as deduct_err:
+            # Логируем, но не отменяем заказ — заказ уже создан
+            import logging
+            logging.getLogger(__name__).warning(
+                'Ошибка списания со склада для заказа %s: %s', order.pk, deduct_err
+            )
         
         return Response({
             'success': True,
@@ -657,10 +674,14 @@ def get_order_detail(request, order_id):
                     if frame_data.get('passepartout_id'):
                         try:
                             passepartout = Passepartout.objects.get(pk=frame_data['passepartout_id'])
+                            pp_image_url = None
+                            if passepartout.image and hasattr(passepartout.image, 'url'):
+                                pp_image_url = request.build_absolute_uri(passepartout.image.url)
                             frame['passepartout'] = {
                                 'id': passepartout.id,
                                 'name': passepartout.name,
                                 'price': float(passepartout.price),
+                                'image': pp_image_url,
                                 'length': float(frame_data['passepartout_length']) if frame_data.get('passepartout_length') else None,
                                 'width': float(frame_data['passepartout_width']) if frame_data.get('passepartout_width') else None,
                             }
@@ -696,6 +717,7 @@ def get_order_detail(request, order_id):
                     'id': order.passepartout.id,
                     'name': order.passepartout.name,
                     'price': float(order.passepartout.price),
+                    'image': request.build_absolute_uri(order.passepartout.image.url) if (order.passepartout.image and hasattr(order.passepartout.image, 'url')) else None,
                     'length': float(order.passepartout_length) if order.passepartout_length else None,
                     'width': float(order.passepartout_width) if order.passepartout_width else None,
                 } if order.passepartout else None,

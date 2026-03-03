@@ -1,5 +1,7 @@
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
+from django.db.models import F
+
 from .models import Baguette, Glass, Backing, Hardware, Podramnik, Package, Molding, Trosik, Podveski, Material, Passepartout, Stretch, Work, WorkPriceSettings
 
 
@@ -301,3 +303,127 @@ class PriceCalculator:
             result['error'] = str(e)
         
         return result
+
+
+class StockDeduction:
+    """Списание материалов со склада при создании заказа"""
+
+    @staticmethod
+    def deduct_from_order(order_data: Dict[str, Any], frames: List[Dict]) -> None:
+        """
+        Списывает материалы со склада на основе данных заказа.
+        Использует F() для атомарного обновления (защита от гонок).
+        """
+        x1 = order_data.get('x1') or Decimal('0')
+        x2 = order_data.get('x2') or Decimal('0')
+
+        # Багет: по каждой раме свой багет и размеры
+        baguette_consumption: Dict[int, Decimal] = {}
+        passepartout_consumption: Dict[int, int] = {}
+
+        if frames:
+            for frame in frames:
+                if frame.get('baguette_id'):
+                    fx1 = Decimal(str(frame.get('x1', x1))) if frame.get('x1') else x1
+                    fx2 = Decimal(str(frame.get('x2', x2))) if frame.get('x2') else x2
+                    if fx1 <= 0 or fx2 <= 0:
+                        fx1, fx2 = x1, x2
+                    baguette = Baguette.objects.filter(pk=frame['baguette_id']).first()
+                    if baguette:
+                        qty = PriceCalculator.calculate_baguette_quantity(fx1, fx2, baguette.width)
+                        bid = baguette.pk
+                        baguette_consumption[bid] = baguette_consumption.get(bid, Decimal('0')) + qty
+
+                if frame.get('passepartout_id'):
+                    pid = frame['passepartout_id']
+                    passepartout_consumption[pid] = passepartout_consumption.get(pid, 0) + 1
+        else:
+            # Одна рама
+            if order_data.get('baguette_id'):
+                baguette = Baguette.objects.filter(pk=order_data['baguette_id']).first()
+                if baguette:
+                    qty = PriceCalculator.calculate_baguette_quantity(x1, x2, baguette.width)
+                    baguette_consumption[baguette.pk] = qty
+            if order_data.get('passepartout_id'):
+                passepartout_consumption[order_data['passepartout_id']] = 1
+
+        # Списание багета
+        for bid, qty in baguette_consumption.items():
+            Baguette.objects.filter(pk=bid).update(stock_quantity=F('stock_quantity') - qty)
+
+        # Площадь стекла (все рамы)
+        if frames:
+            frame_sizes = []
+            for f in frames:
+                if f.get('baguette_id'):
+                    fx1 = Decimal(str(f.get('x1', x1))) if f.get('x1') else x1
+                    fx2 = Decimal(str(f.get('x2', x2))) if f.get('x2') else x2
+                    if fx1 > 0 and fx2 > 0:
+                        frame_sizes.append((fx1, fx2))
+            if not frame_sizes:
+                frame_sizes = [(x1, x2)]
+            total_glass_area = sum(PriceCalculator.calculate_glass_area(a, b) for a, b in frame_sizes)
+        else:
+            total_glass_area = PriceCalculator.calculate_glass_area(x1, x2)
+
+        # Стекло
+        if order_data.get('glass_id') and total_glass_area > 0:
+            Glass.objects.filter(pk=order_data['glass_id']).update(
+                stock_quantity=F('stock_quantity') - total_glass_area
+            )
+
+        # Подкладка (1 шт)
+        if order_data.get('backing_id'):
+            Backing.objects.filter(pk=order_data['backing_id']).update(
+                stock_quantity=F('stock_quantity') - 1
+            )
+
+        # Фурнитура
+        if order_data.get('hardware_id'):
+            hq = order_data.get('hardware_quantity') or 1
+            Hardware.objects.filter(pk=order_data['hardware_id']).update(
+                stock_quantity=F('stock_quantity') - hq
+            )
+
+        # Подрамник (1 шт)
+        if order_data.get('podramnik_id'):
+            Podramnik.objects.filter(pk=order_data['podramnik_id']).update(
+                stock_quantity=F('stock_quantity') - 1
+            )
+
+        # Упаковка (1 шт)
+        if order_data.get('package_id'):
+            Package.objects.filter(pk=order_data['package_id']).update(
+                stock_quantity=F('stock_quantity') - 1
+            )
+
+        # Паспарту
+        for pid, cnt in passepartout_consumption.items():
+            Passepartout.objects.filter(pk=pid).update(
+                stock_quantity=F('stock_quantity') - cnt
+            )
+
+        # Молдинг
+        if order_data.get('molding_id') and order_data.get('molding_consumption'):
+            Molding.objects.filter(pk=order_data['molding_id']).update(
+                stock_quantity=F('stock_quantity') - order_data['molding_consumption']
+            )
+
+        # Тросик
+        if order_data.get('trosik_id') and order_data.get('trosik_length'):
+            Trosik.objects.filter(pk=order_data['trosik_id']).update(
+                stock_quantity=F('stock_quantity') - order_data['trosik_length']
+            )
+
+        # Подвески
+        if order_data.get('podveski_id') and order_data.get('podveski_quantity'):
+            Podveski.objects.filter(pk=order_data['podveski_id']).update(
+                stock_quantity=F('stock_quantity') - order_data['podveski_quantity']
+            )
+
+        # Натяжка (если используется вместо стекла — в данных может быть stretch_id)
+        stretch_id = order_data.get('stretch_id')
+        if stretch_id and total_glass_area > 0:
+            Stretch.objects.filter(pk=stretch_id).update(
+                stock_quantity=F('stock_quantity') - total_glass_area
+            )

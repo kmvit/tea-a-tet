@@ -33,7 +33,12 @@ export const FramePreview = ({ showLabel = true }) => {
     const layers = [];
     for (const frame of frames) {
       if (frame?.passepartout_id) {
-        layers.push({ type: 'passepartout', width: 25, color: PASSEPARTOUT_COLOR });
+        layers.push({
+          type: 'passepartout',
+          width: 25,
+          color: PASSEPARTOUT_COLOR,
+          image: frame?.passepartout_image || null,
+        });
       }
       if ((frame?.baguette_id && frame?.baguette_image) || (orderData.baguette_id && orderData.baguette_image)) {
         const img = frame?.baguette_image || orderData.baguette_image;
@@ -227,8 +232,8 @@ export const FramePreview = ({ showLabel = true }) => {
         img.onerror = () => resolve(createPlaceholder());
         img.src = url;
       });
-    const baguetteLayers = layers.filter((l) => l.type === 'baguette');
-    const baguetteUrls = baguetteLayers.map((l) => l.image || null);
+    const layersWithImages = layers.filter((l) => l.image);
+    const imageUrls = layersWithImages.map((l) => l.image || null);
     const loadPainting = () =>
       paintingImage && typeof paintingImage === 'string'
         ? new Promise((resolve) => {
@@ -239,10 +244,10 @@ export const FramePreview = ({ showLabel = true }) => {
           })
         : Promise.resolve(null);
     Promise.all([
-      ...baguetteUrls.map((url) => (url ? loadImage(url) : Promise.resolve(null))),
+      ...imageUrls.map((url) => (url ? loadImage(url) : Promise.resolve(null))),
       loadPainting(),
     ]).then((results) => {
-      const loadedImgs = results.slice(0, baguetteUrls.length);
+      const loadedImgs = results.slice(0, imageUrls.length);
       const photoImg = results[results.length - 1];
       ctx.clearRect(0, 0, outW, outH);
       if (photoImg) {
@@ -252,21 +257,27 @@ export const FramePreview = ({ showLabel = true }) => {
         ctx.fillRect(photoX, photoY, iwInt, ihInt);
       }
       let rect = { x: photoX, y: photoY, w: iwInt, h: ihInt };
-      let baguetteIdx = 0;
+      let imageIdx = 0;
       const localCanvas = { width: outW, height: outH };
       for (let i = 0; i < layers.length; i++) {
         const layer = layers[i];
         const fw = widths[i] ?? DEFAULT_FRAME_WIDTH;
         if (layer.type === 'passepartout') {
-          rect = drawFrameLayer(ctx, localCanvas, {
-            contentRect: rect,
-            texImgOrCanvas: null,
-            fw,
-            isPassepartout: true,
-            passepartoutColor: layer.color ?? PASSEPARTOUT_COLOR,
-          });
+          const ppImg = layer.image ? loadedImgs[imageIdx++] : null;
+          if (ppImg) {
+            const actualFw = computeFrameWidth(ppImg, rect.w, rect.h, fw);
+            rect = drawFrameLayer(ctx, localCanvas, { contentRect: rect, texImgOrCanvas: ppImg, fw: actualFw });
+          } else {
+            rect = drawFrameLayer(ctx, localCanvas, {
+              contentRect: rect,
+              texImgOrCanvas: null,
+              fw,
+              isPassepartout: true,
+              passepartoutColor: layer.color ?? PASSEPARTOUT_COLOR,
+            });
+          }
         } else {
-          const baguetteImg = loadedImgs[baguetteIdx++];
+          const baguetteImg = loadedImgs[imageIdx++];
           const actualFw = baguetteImg ? computeFrameWidth(baguetteImg, rect.w, rect.h, fw) : fw;
           rect = drawFrameLayer(ctx, localCanvas, { contentRect: rect, texImgOrCanvas: baguetteImg, fw: actualFw });
         }

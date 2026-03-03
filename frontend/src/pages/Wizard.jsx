@@ -58,6 +58,7 @@ export const Wizard = () => {
             baguette_width: null,
             baguette_name: null,
             passepartout_id: null,
+            passepartout_image: null,
             passepartout_length: null,
             passepartout_width: null,
             work_id: null,
@@ -211,7 +212,7 @@ export const Wizard = () => {
       calculateCurrentPrice();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderData.x1, orderData.x2, orderData.frames, orderData.glass_id, orderData.backing_id, orderData.podramnik_id, orderData.hardware_id, orderData.package_id]);
+  }, [orderData.x1, orderData.x2, orderData.frames, orderData.glass_id, orderData.backing_id, orderData.podramnik_id, orderData.hardware_id, orderData.package_id, orderData.molding_id, orderData.molding_consumption]);
 
   // Синхронизация локального состояния с orderData
   useEffect(() => {
@@ -224,6 +225,12 @@ export const Wizard = () => {
     }
     if (orderData.backing_id && !backingId) {
       setBackingId(String(orderData.backing_id));
+    }
+    if (orderData.molding_id && !moldingId) {
+      setMoldingId(String(orderData.molding_id));
+    }
+    if (orderData.molding_consumption != null && orderData.molding_consumption !== '' && !moldingConsumption) {
+      setMoldingConsumption(String(orderData.molding_consumption));
     }
     if (orderData.x2 && !x2) {
       setX2(String(orderData.x2));
@@ -290,11 +297,19 @@ export const Wizard = () => {
       ? [{ ...frames[0], x1: parseFloat(x1), x2: parseFloat(x2) }]
       : frames.map((f) => ({ ...f, x1: parseFloat(f.x1), x2: parseFloat(f.x2) }));
 
-    updateOrderData({
+    const step1Updates = {
       x1: finalFrames[0]?.x1 ?? parseFloat(x1),
       x2: finalFrames[0]?.x2 ?? parseFloat(x2),
       frames: finalFrames,
-    });
+    };
+    if (moldingId && moldingConsumption) {
+      step1Updates.molding_id = parseInt(moldingId);
+      step1Updates.molding_consumption = parseFloat(moldingConsumption);
+    } else {
+      step1Updates.molding_id = null;
+      step1Updates.molding_consumption = null;
+    }
+    updateOrderData(step1Updates);
     setCurrentStep(2);
   };
 
@@ -369,19 +384,11 @@ export const Wizard = () => {
     setCurrentStep(3);
   };
 
-  // Шаг 3: Дополнительные опции (молдинг, тросик, подвески)
+  // Шаг 3: Дополнительные опции (тросик, подвески)
   const handleStep3Submit = (e) => {
     e.preventDefault();
 
     const updates = {};
-
-    if (moldingId && moldingConsumption) {
-      updates.molding_id = parseInt(moldingId);
-      updates.molding_consumption = parseFloat(moldingConsumption);
-    } else {
-      updates.molding_id = null;
-      updates.molding_consumption = null;
-    }
 
     if (trosikId) {
       updates.trosik_id = parseInt(trosikId);
@@ -512,7 +519,7 @@ export const Wizard = () => {
               {currentStep === 1 && (
                 <>
                   <h2 className="text-3xl font-bold text-gray-800 mb-6">
-                    📏 Шаг 1: Укажите размеры и выберите багет
+                    📏 Шаг 1: Рама, паспарту и молдинг
                   </h2>
                   <form onSubmit={handleStep1Submit} className="space-y-6">
                     <div className="space-y-6">
@@ -755,8 +762,11 @@ export const Wizard = () => {
                                 <select
                                   value={frame.passepartout_id ? String(frame.passepartout_id) : ''}
                                   onChange={(e) => {
+                                    const ppId = e.target.value ? parseInt(e.target.value) : null;
+                                    const pp = ppId ? passepartout.find((x) => x.id === ppId) : null;
                                     updateFrame(frameIndex, {
-                                      passepartout_id: e.target.value ? parseInt(e.target.value) : null,
+                                      passepartout_id: ppId,
+                                      passepartout_image: pp?.image || null,
                                     });
                                   }}
                                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
@@ -817,6 +827,66 @@ export const Wizard = () => {
                         </div>
                       ))}
 
+                      {/* Молдинг — после рамы и паспарту */}
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                          Молдинг{' '}
+                          <span className="text-sm font-normal text-gray-500">
+                            (опционально)
+                          </span>
+                        </h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Выберите молдинг
+                            </label>
+                            <select
+                              value={moldingId}
+                              onChange={(e) => {
+                                const newMoldingId = e.target.value;
+                                setMoldingId(newMoldingId);
+                                updateOrderData({
+                                  molding_id: newMoldingId ? parseInt(newMoldingId) : null,
+                                  molding_consumption: newMoldingId && moldingConsumption ? parseFloat(moldingConsumption) : null,
+                                });
+                              }}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            >
+                              <option value="">-- Не выбрано --</option>
+                              {moldings.map((molding) => (
+                                <option key={molding.id} value={molding.id}>
+                                  {molding.name} ({molding.price_per_meter} ₽/м)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {moldingId && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Расход молдинга (м)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={moldingConsumption}
+                                onChange={(e) => {
+                                  const newConsumption = e.target.value;
+                                  setMoldingConsumption(newConsumption);
+                                  if (moldingId && newConsumption) {
+                                    updateOrderData({
+                                      molding_consumption: parseFloat(newConsumption),
+                                    });
+                                  }
+                                }}
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                placeholder="Расход в метрах"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Кнопка добавления рамы */}
                       {frames.length < 3 && (
                         <div className="flex justify-center">
@@ -854,9 +924,8 @@ export const Wizard = () => {
                         </div>
                         <div className="ml-3">
                           <p className="text-sm text-blue-700">
-                            Введите размеры вашей картины в сантиметрах и выберите багет для каждой рамы (можно добавить до 3 рам). На
-                            основе этих данных будет рассчитано количество
-                            необходимых материалов.
+                            Введите размеры вашей картины в сантиметрах, выберите багет и паспарту для каждой рамы (можно добавить до 3 рам).
+                            При необходимости укажите молдинг. На основе этих данных будет рассчитано количество необходимых материалов.
                           </p>
                         </div>
                       </div>
@@ -1050,65 +1119,6 @@ export const Wizard = () => {
 
                   <form onSubmit={handleStep3Submit} className="space-y-6">
                     <div className="space-y-6">
-                      {/* Молдинг */}
-                      <div className="wizard-section p-6">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                          Молдинг
-                        </h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Выберите молдинг
-                            </label>
-                            <select
-                              value={moldingId}
-                              onChange={(e) => {
-                                const newMoldingId = e.target.value;
-                                setMoldingId(newMoldingId);
-                                // Сразу обновляем orderData для пересчета цены
-                                updateOrderData({
-                                  molding_id: newMoldingId ? parseInt(newMoldingId) : null,
-                                  molding_consumption: newMoldingId && moldingConsumption ? parseFloat(moldingConsumption) : null,
-                                });
-                              }}
-                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                            >
-                              <option value="">-- Не выбрано --</option>
-                              {moldings.map((molding) => (
-                                <option key={molding.id} value={molding.id}>
-                                  {molding.name} ({molding.price_per_meter} ₽/м)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          {moldingId && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Расход молдинга (м)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={moldingConsumption}
-                                onChange={(e) => {
-                                  const newConsumption = e.target.value;
-                                  setMoldingConsumption(newConsumption);
-                                  // Сразу обновляем orderData для пересчета цены
-                                  if (moldingId && newConsumption) {
-                                    updateOrderData({
-                                      molding_consumption: parseFloat(newConsumption),
-                                    });
-                                  }
-                                }}
-                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                placeholder="Расход в метрах"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
                       {/* Тросик */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
