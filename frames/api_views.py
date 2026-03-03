@@ -205,7 +205,7 @@ def get_works(request):
 def calculate_price_api(request):
     """API для расчета цены заказа"""
     try:
-        data = json.loads(request.body) if isinstance(request.body, bytes) else request.data
+        data = request.data
         
         # Получаем данные для расчета
         x1 = Decimal(str(data.get('x1', 0))) if data.get('x1') else Decimal('0')
@@ -366,7 +366,7 @@ def calculate_price_api(request):
 def create_order_api(request):
     """API для создания заказа"""
     try:
-        data = json.loads(request.body) if isinstance(request.body, bytes) else request.data
+        data = request.data
         
         # Проверяем наличие массив рамок
         frames = data.get('frames', [])
@@ -888,8 +888,8 @@ def update_order_status(request, order_id):
     """API для изменения статуса заказа"""
     try:
         order = Order.objects.get(pk=order_id)
-        data = json.loads(request.body) if isinstance(request.body, bytes) else request.data
-        
+        data = request.data
+
         new_status = data.get('status')
         if new_status not in dict(Order.STATUS_CHOICES):
             return Response({'error': 'Некорректный статус'}, status=400)
