@@ -368,16 +368,12 @@ export const Wizard = () => {
     setBaguetteSearches(newSearches);
   };
 
-  // Шаг 2: Стекло, подкладка и подрамник вместе
+  // Шаг 2: Стекло, подкладка и подрамник вместе (всё опционально)
   const handleStep2Submit = (e) => {
     e.preventDefault();
-    if (!glassId || !backingId) {
-      return;
-    }
-
     updateOrderData({
-      glass_id: parseInt(glassId),
-      backing_id: parseInt(backingId),
+      glass_id: glassId ? parseInt(glassId) : null,
+      backing_id: backingId ? parseInt(backingId) : null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
       stretch_id: stretchId ? parseInt(stretchId) : null,
     });
@@ -469,7 +465,7 @@ export const Wizard = () => {
       const hasBaguette = hasFrames && orderData.frames.some(f => f.baguette_id);
       return orderData.x1 && orderData.x2 && hasBaguette;
     }
-    if (stepNumber === 2) return orderData.glass_id && orderData.backing_id;
+    if (stepNumber === 2) return true; // Стекло, подкладка и подрамник опциональны
     if (stepNumber === 3) return true; // Дополнительные опции опциональны
     if (stepNumber === 4) return true; // Фурнитура и упаковка опциональны
     if (stepNumber === 5) return orderData.customer_name && orderData.customer_phone;
@@ -955,7 +951,10 @@ export const Wizard = () => {
                       {/* Стекло */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                          Стекло
+                          Стекло{' '}
+                          <span className="text-sm font-normal text-gray-500">
+                            (опционально)
+                          </span>
                         </h3>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -986,7 +985,10 @@ export const Wizard = () => {
                       {/* Подкладка */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                          Подкладка
+                          Подкладка{' '}
+                          <span className="text-sm font-normal text-gray-500">
+                            (опционально)
+                          </span>
                         </h3>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1093,8 +1095,7 @@ export const Wizard = () => {
                       </button>
                       <button
                         type="submit"
-                        disabled={!glassId || !backingId}
-                        className="wizard-button-primary px-8 py-3 font-semibold disabled:cursor-not-allowed"
+                        className="wizard-button-primary px-8 py-3 font-semibold"
                       >
                         Далее →
                       </button>
