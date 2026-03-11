@@ -22,15 +22,13 @@ class PriceCalculator:
     @staticmethod
     def calculate_baguette_quantity(x1: Decimal, x2: Decimal, width: Decimal) -> Decimal:
         """
-        Расчет количества багета по формуле: (X1 + X2) * 2 + 8 * W
-        где W - ширина багета в см, результат в метрах
+        Расчет количества багета по формуле: L + 8 * W,
+        где L = 2 * (X1 + X2) в метрах, W - ширина багета в метрах.
         """
-        # Переводим см в метры для ширины
-        width_meters = width / 100
         # (X1 + X2) в см, переводим в метры
         perimeter = ((x1 + x2) * 2) / 100
-        # Добавляем 8 * ширину багета
-        total = perimeter + 8 * width_meters
+        # Ширина багета хранится в метрах
+        total = perimeter + 8 * width
         return total
     
     @staticmethod
@@ -41,6 +39,18 @@ class PriceCalculator:
         # X1 и X2 в см, переводим в метры
         area_sqm = (x1 / 100) * (x2 / 100)
         return area_sqm
+
+    @staticmethod
+    def normalize_length_to_meters(length: Decimal) -> Decimal:
+        """
+        Нормализация длины в метры.
+        Значения больше 10 считаем введенными в сантиметрах и переводим в метры.
+        """
+        if length is None:
+            return Decimal('0')
+        if length > Decimal('10'):
+            return length / Decimal('100')
+        return length
     
     @staticmethod
     def calculate_baguette_price(
@@ -154,11 +164,15 @@ class PriceCalculator:
             # Подкладка
             if backing_id:
                 backing = Backing.objects.get(pk=backing_id)
+                backing_area = PriceCalculator.calculate_glass_area(x1, x2)
+                backing_price = backing.price * backing_area
                 result['components']['backing'] = {
                     'name': backing.name,
-                    'total_price': float(backing.price)
+                    'area': float(backing_area),
+                    'unit_price': float(backing.price),
+                    'total_price': float(backing_price)
                 }
-                result['total_price'] += backing.price
+                result['total_price'] += backing_price
                 selected_material_types.append('backing')
             
             # Фурнитура
@@ -177,11 +191,15 @@ class PriceCalculator:
             # Подрамник
             if podramnik_id:
                 podramnik = Podramnik.objects.get(pk=podramnik_id)
+                podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
+                podramnik_price = podramnik.price * podramnik_qty
                 result['components']['podramnik'] = {
                     'name': podramnik.name,
-                    'total_price': float(podramnik.price)
+                    'quantity': float(podramnik_qty),
+                    'unit_price': float(podramnik.price),
+                    'total_price': float(podramnik_price)
                 }
-                result['total_price'] += podramnik.price
+                result['total_price'] += podramnik_price
                 selected_material_types.append('podramnik')
             
             # Упаковка
@@ -211,10 +229,11 @@ class PriceCalculator:
             # Тросик
             if trosik_id and trosik_length:
                 trosik = Trosik.objects.get(pk=trosik_id)
-                trosik_price = trosik.price_per_meter * trosik_length
+                trosik_length_m = PriceCalculator.normalize_length_to_meters(trosik_length)
+                trosik_price = trosik.price_per_meter * trosik_length_m
                 result['components']['trosik'] = {
                     'name': trosik.name,
-                    'length': float(trosik_length),
+                    'length': float(trosik_length_m),
                     'unit_price': float(trosik.price_per_meter),
                     'total_price': float(trosik_price)
                 }
@@ -237,14 +256,19 @@ class PriceCalculator:
             # Паспарту
             if passepartout_id:
                 passepartout = Passepartout.objects.get(pk=passepartout_id)
-                # Цена паспарту фиксированная, размеры используются только для информации
+                pp_length = passepartout_length if passepartout_length else x1
+                pp_width = passepartout_width if passepartout_width else x2
+                pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                pp_price = passepartout.price * pp_area
                 result['components']['passepartout'] = {
                     'name': passepartout.name,
-                    'length': float(passepartout_length) if passepartout_length else None,
-                    'width': float(passepartout_width) if passepartout_width else None,
-                    'total_price': float(passepartout.price)
+                    'length': float(pp_length),
+                    'width': float(pp_width),
+                    'area': float(pp_area),
+                    'unit_price': float(passepartout.price),
+                    'total_price': float(pp_price)
                 }
-                result['total_price'] += passepartout.price
+                result['total_price'] += pp_price
                 selected_material_types.append('passepartout')
             
             # Натяжка
@@ -309,7 +333,7 @@ class StockDeduction:
     """Списание материалов со склада при создании заказа"""
 
     @staticmethod
-    def deduct_from_order(order_data: Dict[str, Any], frames: List[Dict]) -> None:
+    def deduct_from_order(order_data: Dict[str, Any], frames: List[Dict], passepartouts: Optional[List[Dict]] = None) -> None:
         """
         Списывает материалы со склада на основе данных заказа.
         Использует F() для атомарного обновления (защита от гонок).
@@ -319,7 +343,7 @@ class StockDeduction:
 
         # Багет: по каждой раме свой багет и размеры
         baguette_consumption: Dict[int, Decimal] = {}
-        passepartout_consumption: Dict[int, int] = {}
+        passepartout_consumption: Dict[int, Decimal] = {}
 
         if frames:
             for frame in frames:
@@ -336,7 +360,12 @@ class StockDeduction:
 
                 if frame.get('passepartout_id'):
                     pid = frame['passepartout_id']
-                    passepartout_consumption[pid] = passepartout_consumption.get(pid, 0) + 1
+                    fx1 = Decimal(str(frame.get('x1', x1))) if frame.get('x1') else x1
+                    fx2 = Decimal(str(frame.get('x2', x2))) if frame.get('x2') else x2
+                    pp_length = Decimal(str(frame.get('passepartout_length'))) if frame.get('passepartout_length') else fx1
+                    pp_width = Decimal(str(frame.get('passepartout_width'))) if frame.get('passepartout_width') else fx2
+                    pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                    passepartout_consumption[pid] = passepartout_consumption.get(pid, Decimal('0')) + pp_area
         else:
             # Одна рама
             if order_data.get('baguette_id'):
@@ -345,7 +374,20 @@ class StockDeduction:
                     qty = PriceCalculator.calculate_baguette_quantity(x1, x2, baguette.width)
                     baguette_consumption[baguette.pk] = qty
             if order_data.get('passepartout_id'):
-                passepartout_consumption[order_data['passepartout_id']] = 1
+                pp_length = Decimal(str(order_data.get('passepartout_length'))) if order_data.get('passepartout_length') else x1
+                pp_width = Decimal(str(order_data.get('passepartout_width'))) if order_data.get('passepartout_width') else x2
+                passepartout_consumption[order_data['passepartout_id']] = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+
+        # Новый формат: отдельный список паспарту (независимо от рам)
+        if passepartouts:
+            for pp in passepartouts:
+                pid = pp.get('passepartout_id')
+                if not pid:
+                    continue
+                pp_length = Decimal(str(pp.get('passepartout_length'))) if pp.get('passepartout_length') else x1
+                pp_width = Decimal(str(pp.get('passepartout_width'))) if pp.get('passepartout_width') else x2
+                pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                passepartout_consumption[pid] = passepartout_consumption.get(pid, Decimal('0')) + pp_area
 
         # Списание багета
         for bid, qty in baguette_consumption.items():
@@ -372,10 +414,10 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - total_glass_area
             )
 
-        # Подкладка (1 шт)
-        if order_data.get('backing_id'):
+        # Подкладка (по площади)
+        if order_data.get('backing_id') and total_glass_area > 0:
             Backing.objects.filter(pk=order_data['backing_id']).update(
-                stock_quantity=F('stock_quantity') - 1
+                stock_quantity=F('stock_quantity') - total_glass_area
             )
 
         # Фурнитура
@@ -385,10 +427,22 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - hq
             )
 
-        # Подрамник (1 шт)
+        # Подрамник (как по раме - погонные метры)
         if order_data.get('podramnik_id'):
+            if frames:
+                total_podramnik_qty = Decimal('0')
+                for f in frames:
+                    if f.get('baguette_id'):
+                        fx1 = Decimal(str(f.get('x1', x1))) if f.get('x1') else x1
+                        fx2 = Decimal(str(f.get('x2', x2))) if f.get('x2') else x2
+                        if fx1 > 0 and fx2 > 0:
+                            total_podramnik_qty += PriceCalculator.calculate_baguette_quantity(fx1, fx2, Decimal('0'))
+                if total_podramnik_qty <= 0:
+                    total_podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
+            else:
+                total_podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
             Podramnik.objects.filter(pk=order_data['podramnik_id']).update(
-                stock_quantity=F('stock_quantity') - 1
+                stock_quantity=F('stock_quantity') - total_podramnik_qty
             )
 
         # Упаковка (1 шт)
@@ -398,9 +452,9 @@ class StockDeduction:
             )
 
         # Паспарту
-        for pid, cnt in passepartout_consumption.items():
+        for pid, qty in passepartout_consumption.items():
             Passepartout.objects.filter(pk=pid).update(
-                stock_quantity=F('stock_quantity') - cnt
+                stock_quantity=F('stock_quantity') - qty
             )
 
         # Молдинг
@@ -411,8 +465,9 @@ class StockDeduction:
 
         # Тросик
         if order_data.get('trosik_id') and order_data.get('trosik_length'):
+            trosik_length_m = PriceCalculator.normalize_length_to_meters(Decimal(str(order_data['trosik_length'])))
             Trosik.objects.filter(pk=order_data['trosik_id']).update(
-                stock_quantity=F('stock_quantity') - order_data['trosik_length']
+                stock_quantity=F('stock_quantity') - trosik_length_m
             )
 
         # Подвески

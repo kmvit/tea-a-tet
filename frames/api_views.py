@@ -13,6 +13,35 @@ from .services import PriceCalculator, StockDeduction
 from orders.models import Order
 
 
+def _collect_passepartouts(passepartouts_data, frames):
+    """Собирает список паспарту из нового формата и legacy-данных рам."""
+    items = []
+
+    if isinstance(passepartouts_data, list):
+        for pp in passepartouts_data:
+            if isinstance(pp, dict) and pp.get('passepartout_id'):
+                items.append(pp)
+
+    if frames:
+        # Новый формат может храниться внутри первой рамы в frames_data
+        embedded = frames[0].get('passepartouts') if isinstance(frames[0], dict) else None
+        if isinstance(embedded, list):
+            for pp in embedded:
+                if isinstance(pp, dict) and pp.get('passepartout_id'):
+                    items.append(pp)
+
+        # Legacy: паспарту было привязано к каждой раме
+        for frame in frames:
+            if isinstance(frame, dict) and frame.get('passepartout_id'):
+                items.append({
+                    'passepartout_id': frame.get('passepartout_id'),
+                    'passepartout_length': frame.get('passepartout_length'),
+                    'passepartout_width': frame.get('passepartout_width'),
+                })
+
+    return items
+
+
 @api_view(['GET'])
 def get_baguettes(request):
     """API для получения списка багетов с поддержкой поиска"""
@@ -213,6 +242,7 @@ def calculate_price_api(request):
         
         # Проверяем, есть ли массив рамок
         frames = data.get('frames', [])
+        passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
         
         if frames and len(frames) > 0:
             # Для нескольких рам — x1, x2 могут быть в каждой раме
@@ -246,9 +276,6 @@ def calculate_price_api(request):
                         x1=fx1,
                         x2=fx2,
                         baguette_id=frame.get('baguette_id'),
-                        passepartout_id=frame.get('passepartout_id'),
-                        passepartout_length=Decimal(str(frame.get('passepartout_length'))) if frame.get('passepartout_length') else None,
-                        passepartout_width=Decimal(str(frame.get('passepartout_width'))) if frame.get('passepartout_width') else None,
                         work_id=frame.get('work_id'),
                     )
                     
@@ -262,6 +289,26 @@ def calculate_price_api(request):
                                 'name': f"{value.get('name', key)} (Рама {frame_num})"
                             }
                             result['total_price'] += Decimal(str(value.get('total_price', 0)))
+
+            # Паспарту: независимая группировка (до 3 шт)
+            for pp_idx, pp_data in enumerate(passepartouts):
+                pp_id = pp_data.get('passepartout_id')
+                if not pp_id:
+                    continue
+                passepartout = Passepartout.objects.get(pk=pp_id)
+                pp_length = Decimal(str(pp_data.get('passepartout_length'))) if pp_data.get('passepartout_length') else x1
+                pp_width = Decimal(str(pp_data.get('passepartout_width'))) if pp_data.get('passepartout_width') else x2
+                pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                pp_price = pp_area * passepartout.price
+                result['components'][f'passepartout_{pp_idx + 1}'] = {
+                    'name': f'{passepartout.name} (Паспарту {pp_idx + 1})',
+                    'length': float(pp_length),
+                    'width': float(pp_width),
+                    'area': float(pp_area),
+                    'unit_price': float(passepartout.price),
+                    'total_price': float(pp_price),
+                }
+                result['total_price'] += pp_price
             
             # Для стекла/натяжки: при разных размерах рам суммируем площади
             # Определяем размеры для расчёта общих компонентов
@@ -275,7 +322,7 @@ def calculate_price_api(request):
             if not frame_sizes:
                 frame_sizes = [(x1, x2)] if x1 and x2 else []
 
-            # Используем первую пару размеров для подкладки и пр., суммарную площадь — для стекла/натяжки
+            # Используем первую пару размеров только для компонентов, которые не зависят от суммирования рам
             eff_x1, eff_x2 = frame_sizes[0] if frame_sizes else (x1, x2)
             other_calculation = PriceCalculator.calculate_total_price(
                 x1=eff_x1,
@@ -323,9 +370,37 @@ def calculate_price_api(request):
                 }
                 result['total_price'] += Decimal(str(stretch_price))
 
+            # Подкладка — по суммарной площади всех рам
+            if data.get('backing_id') and total_glass_area > 0:
+                backing = Backing.objects.get(pk=data['backing_id'])
+                backing_price = total_glass_area * backing.price
+                result['components']['backing'] = {
+                    'name': backing.name,
+                    'area': float(total_glass_area),
+                    'unit_price': float(backing.price),
+                    'total_price': float(backing_price),
+                }
+                result['total_price'] += Decimal(str(backing_price))
+
+            # Подрамник — как по раме, суммируем по всем рамам
+            if data.get('podramnik_id') and frame_sizes:
+                podramnik = Podramnik.objects.get(pk=data['podramnik_id'])
+                total_podramnik_qty = sum(
+                    PriceCalculator.calculate_baguette_quantity(fx1, fx2, Decimal('0'))
+                    for fx1, fx2 in frame_sizes
+                )
+                podramnik_price = total_podramnik_qty * podramnik.price
+                result['components']['podramnik'] = {
+                    'name': podramnik.name,
+                    'quantity': float(total_podramnik_qty),
+                    'unit_price': float(podramnik.price),
+                    'total_price': float(podramnik_price),
+                }
+                result['total_price'] += Decimal(str(podramnik_price))
+
             # Добавляем остальные компоненты (без glass и stretch — они уже добавлены)
             for key, value in other_calculation.get('components', {}).items():
-                if key not in ('glass', 'stretch'):
+                if key not in ('glass', 'stretch', 'backing', 'podramnik'):
                     result['components'][key] = value
                     result['total_price'] += Decimal(str(value.get('total_price', 0)))
             
@@ -355,6 +430,25 @@ def calculate_price_api(request):
                 stretch_id=data.get('stretch_id'),
                 work_id=data.get('work_id'),
             )
+            if passepartouts:
+                for pp_idx, pp_data in enumerate(passepartouts):
+                    pp_id = pp_data.get('passepartout_id')
+                    if not pp_id:
+                        continue
+                    passepartout = Passepartout.objects.get(pk=pp_id)
+                    pp_length = Decimal(str(pp_data.get('passepartout_length'))) if pp_data.get('passepartout_length') else x1
+                    pp_width = Decimal(str(pp_data.get('passepartout_width'))) if pp_data.get('passepartout_width') else x2
+                    pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                    pp_price = pp_area * passepartout.price
+                    calculation['components'][f'passepartout_{pp_idx + 1}'] = {
+                        'name': f'{passepartout.name} (Паспарту {pp_idx + 1})',
+                        'length': float(pp_length),
+                        'width': float(pp_width),
+                        'area': float(pp_area),
+                        'unit_price': float(passepartout.price),
+                        'total_price': float(pp_price),
+                    }
+                    calculation['total_price'] += float(pp_price)
             
             return Response(calculation)
     
@@ -370,6 +464,7 @@ def create_order_api(request):
         
         # Проверяем наличие массив рамок
         frames = data.get('frames', [])
+        passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
         
         # Определяем данные для заказа
         # Если есть массив рамок, берем первую раму для сохранения в Order (модель поддерживает только одну раму)
@@ -377,15 +472,27 @@ def create_order_api(request):
         if frames and len(frames) > 0:
             first_frame = frames[0]
             baguette_id = first_frame.get('baguette_id')
-            passepartout_id = first_frame.get('passepartout_id')
-            passepartout_length = first_frame.get('passepartout_length')
-            passepartout_width = first_frame.get('passepartout_width')
+            if passepartouts:
+                first_pp = passepartouts[0]
+                passepartout_id = first_pp.get('passepartout_id')
+                passepartout_length = first_pp.get('passepartout_length')
+                passepartout_width = first_pp.get('passepartout_width')
+            else:
+                passepartout_id = first_frame.get('passepartout_id')
+                passepartout_length = first_frame.get('passepartout_length')
+                passepartout_width = first_frame.get('passepartout_width')
         else:
             # Обратная совместимость со старой структурой
             baguette_id = data.get('baguette_id')
-            passepartout_id = data.get('passepartout_id')
-            passepartout_length = data.get('passepartout_length')
-            passepartout_width = data.get('passepartout_width')
+            if passepartouts:
+                first_pp = passepartouts[0]
+                passepartout_id = first_pp.get('passepartout_id')
+                passepartout_length = first_pp.get('passepartout_length')
+                passepartout_width = first_pp.get('passepartout_width')
+            else:
+                passepartout_id = data.get('passepartout_id')
+                passepartout_length = data.get('passepartout_length')
+                passepartout_width = data.get('passepartout_width')
         
         # x1, x2 для Order — из первой рамы или глобально
         ord_x1 = data.get('x1')
@@ -435,7 +542,9 @@ def create_order_api(request):
         if data.get('trosik_id'):
             order_data['trosik_id'] = data.get('trosik_id')
             if data.get('trosik_length'):
-                order_data['trosik_length'] = Decimal(str(data.get('trosik_length')))
+                order_data['trosik_length'] = PriceCalculator.normalize_length_to_meters(
+                    Decimal(str(data.get('trosik_length')))
+                )
         
         if data.get('podveski_id'):
             order_data['podveski_id'] = data.get('podveski_id')
@@ -463,9 +572,6 @@ def create_order_api(request):
                         x1=fx1,
                         x2=fx2,
                         baguette_id=frame.get('baguette_id'),
-                        passepartout_id=frame.get('passepartout_id'),
-                        passepartout_length=Decimal(str(frame.get('passepartout_length'))) if frame.get('passepartout_length') else None,
-                        passepartout_width=Decimal(str(frame.get('passepartout_width'))) if frame.get('passepartout_width') else None,
                         work_id=frame.get('work_id'),
                     )
                     frame_num = idx + 1
@@ -476,6 +582,15 @@ def create_order_api(request):
                                 **value,
                                 'name': f"{value.get('name', key)} (Рама {frame_num})"
                             }
+            for pp_data in passepartouts:
+                pp_id = pp_data.get('passepartout_id')
+                if not pp_id:
+                    continue
+                passepartout = Passepartout.objects.get(pk=pp_id)
+                pp_length = Decimal(str(pp_data.get('passepartout_length'))) if pp_data.get('passepartout_length') else x1
+                pp_width = Decimal(str(pp_data.get('passepartout_width'))) if pp_data.get('passepartout_width') else x2
+                pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                result['total_price'] += pp_area * passepartout.price
             if not frame_sizes:
                 frame_sizes = [(x1, x2)]
             eff_x1, eff_x2 = frame_sizes[0]
@@ -497,8 +612,20 @@ def create_order_api(request):
                 podveski_quantity=order_data.get('podveski_quantity'),
             )
             for key, value in other_calculation.get('components', {}).items():
-                if key not in ('glass', 'stretch'):
+                if key not in ('glass', 'stretch', 'backing', 'podramnik'):
                     result['total_price'] += Decimal(str(value.get('total_price', 0)))
+
+            if order_data.get('backing_id') and total_glass_area > 0:
+                backing = Backing.objects.get(pk=order_data['backing_id'])
+                result['total_price'] += total_glass_area * backing.price
+
+            if order_data.get('podramnik_id') and frame_sizes:
+                podramnik = Podramnik.objects.get(pk=order_data['podramnik_id'])
+                total_podramnik_qty = sum(
+                    PriceCalculator.calculate_baguette_quantity(fx1, fx2, Decimal('0'))
+                    for fx1, fx2 in frame_sizes
+                )
+                result['total_price'] += total_podramnik_qty * podramnik.price
             if order_data.get('glass_id') and total_glass_area > 0:
                 from frames.models import Glass
                 glass = Glass.objects.get(pk=order_data['glass_id'])
@@ -556,7 +683,10 @@ def create_order_api(request):
         
         # Сохраняем все рамы в JSON
         if frames and len(frames) > 0:
-            order_data['frames_data'] = json.dumps(frames)
+            frames_to_save = [dict(frame) for frame in frames]
+            if passepartouts:
+                frames_to_save[0]['passepartouts'] = passepartouts
+            order_data['frames_data'] = json.dumps(frames_to_save)
         
         # Создаем заказ
         order = Order.objects.create(**order_data)
@@ -566,7 +696,7 @@ def create_order_api(request):
         if data.get('stretch_id'):
             deduct_data['stretch_id'] = data['stretch_id']
         try:
-            StockDeduction.deduct_from_order(deduct_data, frames or [])
+            StockDeduction.deduct_from_order(deduct_data, frames or [], passepartouts=passepartouts)
         except Exception as deduct_err:
             # Логируем, но не отменяем заказ — заказ уже создан
             import logging
@@ -648,11 +778,16 @@ def get_order_detail(request, order_id):
         
         # Формируем информацию о рамах
         frames = []
+        passepartouts_data = []
         
         # Если есть сохраненные данные о всех рамах, восстанавливаем их
         if order.frames_data:
             try:
                 saved_frames = json.loads(order.frames_data)
+                if isinstance(saved_frames, list) and saved_frames:
+                    embedded_pp = saved_frames[0].get('passepartouts') if isinstance(saved_frames[0], dict) else []
+                    if isinstance(embedded_pp, list):
+                        passepartouts_data = embedded_pp
                 for frame_data in saved_frames:
                     frame = {}
                     
@@ -726,6 +861,27 @@ def get_order_detail(request, order_id):
                 frame_from_order['work_id'] = order.work.id
                 frame_from_order['work'] = {'id': order.work.id, 'name': order.work.name, 'price': float(order.work.price)}
             frames.append(frame_from_order)
+
+        restored_passepartouts = []
+        for pp in passepartouts_data:
+            pp_id = pp.get('passepartout_id')
+            if not pp_id:
+                continue
+            try:
+                pp_obj = Passepartout.objects.get(pk=pp_id)
+            except Passepartout.DoesNotExist:
+                continue
+            pp_image_url = None
+            if pp_obj.image and hasattr(pp_obj.image, 'url'):
+                pp_image_url = request.build_absolute_uri(pp_obj.image.url)
+            restored_passepartouts.append({
+                'id': pp_obj.id,
+                'name': pp_obj.name,
+                'price': float(pp_obj.price),
+                'image': pp_image_url,
+                'length': float(pp.get('passepartout_length')) if pp.get('passepartout_length') else None,
+                'width': float(pp.get('passepartout_width')) if pp.get('passepartout_width') else None,
+            })
         
         # Пересчитываем цену с учетом всех рамок
         if frames and len(frames) > 0:
@@ -758,6 +914,22 @@ def get_order_detail(request, order_id):
                                 'name': f"{value.get('name', key)} (Рама {frame_num})"
                             }
                             result['total_price'] += Decimal(str(value.get('total_price', 0)))
+
+            for pp_idx, pp_data in enumerate(restored_passepartouts):
+                pp_obj = Passepartout.objects.get(pk=pp_data['id'])
+                pp_length = Decimal(str(pp_data.get('length'))) if pp_data.get('length') else order.x1
+                pp_width = Decimal(str(pp_data.get('width'))) if pp_data.get('width') else order.x2
+                pp_area = PriceCalculator.calculate_glass_area(pp_length, pp_width)
+                pp_price = pp_area * pp_obj.price
+                result['components'][f'passepartout_{pp_idx + 1}'] = {
+                    'name': f"{pp_obj.name} (Паспарту {pp_idx + 1})",
+                    'length': float(pp_length),
+                    'width': float(pp_width),
+                    'area': float(pp_area),
+                    'unit_price': float(pp_obj.price),
+                    'total_price': float(pp_price),
+                }
+                result['total_price'] += pp_price
             
             # Добавляем остальные компоненты (стекло, подкладка и т.д.) только один раз (работа привязана к раме)
             other_calculation = PriceCalculator.calculate_total_price(
@@ -812,6 +984,7 @@ def get_order_detail(request, order_id):
             'x1': float(order.x1),
             'x2': float(order.x2),
             'frames': frames,
+            'passepartouts': restored_passepartouts,
             'glass': {
                 'id': order.glass.id,
                 'name': order.glass.name,

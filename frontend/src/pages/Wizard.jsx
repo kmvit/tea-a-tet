@@ -57,14 +57,11 @@ export const Wizard = () => {
             baguette_image: null,
             baguette_width: null,
             baguette_name: null,
-            passepartout_id: null,
-            passepartout_image: null,
-            passepartout_length: null,
-            passepartout_width: null,
             work_id: null,
           }
         ]
   );
+  const [passepartoutsData, setPassepartoutsData] = useState(orderData.passepartouts || []);
   // Поиск багетов для каждой рамы
   const [baguetteSearches, setBaguetteSearches] = useState(['']);
   const baguetteSearchTimeoutRef = useRef(null);
@@ -212,13 +209,34 @@ export const Wizard = () => {
       calculateCurrentPrice();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderData.x1, orderData.x2, orderData.frames, orderData.glass_id, orderData.backing_id, orderData.podramnik_id, orderData.hardware_id, orderData.package_id, orderData.molding_id, orderData.molding_consumption]);
+  }, [
+    orderData.x1,
+    orderData.x2,
+    orderData.frames,
+    orderData.passepartouts,
+    orderData.glass_id,
+    orderData.backing_id,
+    orderData.podramnik_id,
+    orderData.hardware_id,
+    orderData.hardware_quantity,
+    orderData.package_id,
+    orderData.molding_id,
+    orderData.molding_consumption,
+    orderData.trosik_id,
+    orderData.trosik_length,
+    orderData.podveski_id,
+    orderData.podveski_quantity,
+    orderData.stretch_id,
+  ]);
 
   // Синхронизация локального состояния с orderData
   useEffect(() => {
     if (orderData.frames && orderData.frames.length > 0 && frames.length === 0) {
       setFrames(orderData.frames);
       setBaguetteSearches(orderData.frames.map(() => ''));
+    }
+    if (orderData.passepartouts && orderData.passepartouts.length > 0 && passepartoutsData.length === 0) {
+      setPassepartoutsData(orderData.passepartouts);
     }
     if (orderData.glass_id && !glassId) {
       setGlassId(String(orderData.glass_id));
@@ -249,7 +267,7 @@ export const Wizard = () => {
       setAdvancePayment(String(orderData.advance_payment));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderData]);
+  }, [orderData, passepartoutsData.length]);
 
   // Автоматическая установка длины тросика равной ширине картины (x2)
   useEffect(() => {
@@ -301,6 +319,7 @@ export const Wizard = () => {
       x1: finalFrames[0]?.x1 ?? parseFloat(x1),
       x2: finalFrames[0]?.x2 ?? parseFloat(x2),
       frames: finalFrames,
+      passepartouts: passepartoutsData,
     };
     if (moldingId && moldingConsumption) {
       step1Updates.molding_id = parseInt(moldingId);
@@ -323,9 +342,6 @@ export const Wizard = () => {
         baguette_image: null,
         baguette_width: null,
         baguette_name: null,
-        passepartout_id: null,
-        passepartout_length: null,
-        passepartout_width: null,
         work_id: null,
       };
       const newFrames = [...frames, newFrame];
@@ -368,6 +384,36 @@ export const Wizard = () => {
     setBaguetteSearches(newSearches);
   };
 
+  // Паспарту (независимо от количества рам)
+  const addPassepartout = () => {
+    if (passepartoutsData.length < 3) {
+      const newPps = [
+        ...passepartoutsData,
+        {
+          passepartout_id: null,
+          passepartout_image: null,
+          passepartout_length: null,
+          passepartout_width: null,
+        },
+      ];
+      setPassepartoutsData(newPps);
+      updateOrderData({ passepartouts: newPps });
+    }
+  };
+
+  const removePassepartout = (index) => {
+    const newPps = passepartoutsData.filter((_, i) => i !== index);
+    setPassepartoutsData(newPps);
+    updateOrderData({ passepartouts: newPps });
+  };
+
+  const updatePassepartout = (index, updates) => {
+    const newPps = [...passepartoutsData];
+    newPps[index] = { ...newPps[index], ...updates };
+    setPassepartoutsData(newPps);
+    updateOrderData({ passepartouts: newPps });
+  };
+
   // Шаг 2: Стекло, подкладка и подрамник вместе (всё опционально)
   const handleStep2Submit = (e) => {
     e.preventDefault();
@@ -388,8 +434,8 @@ export const Wizard = () => {
 
     if (trosikId) {
       updates.trosik_id = parseInt(trosikId);
-      // Длина тросика равна ширине картины (x2)
-      updates.trosik_length = parseFloat(trosikLength || x2 || 0);
+      // Длина тросика в БД хранится в метрах, в интерфейсе вводим/показываем см.
+      updates.trosik_length = parseFloat(trosikLength || x2 || 0) / 100;
     } else {
       updates.trosik_id = null;
       updates.trosik_length = null;
@@ -746,21 +792,55 @@ export const Wizard = () => {
                               </div>
                             </div>
 
-                            {/* Паспарту */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Паспарту{' '}
-                                <span className="text-sm font-normal text-gray-500">
-                                  (опционально)
-                                </span>
-                              </label>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Кнопка добавления рамы */}
+                      {frames.length < 3 && (
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={addFrame}
+                            className="wizard-button-add px-6 py-3 font-semibold"
+                          >
+                            + Добавить раму
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Паспарту (независимо от количества рам) */}
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                          Паспарту{' '}
+                          <span className="text-sm font-normal text-gray-500">
+                            (до 3, опционально)
+                          </span>
+                        </h3>
+
+                        <div className="space-y-4">
+                          {passepartoutsData.map((ppData, ppIndex) => (
+                            <div key={ppIndex} className="wizard-frame-card p-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-semibold text-gray-800">
+                                  Паспарту {ppIndex + 1}
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => removePassepartout(ppIndex)}
+                                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+
                               <div className="space-y-4">
                                 <select
-                                  value={frame.passepartout_id ? String(frame.passepartout_id) : ''}
+                                  value={ppData.passepartout_id ? String(ppData.passepartout_id) : ''}
                                   onChange={(e) => {
                                     const ppId = e.target.value ? parseInt(e.target.value) : null;
                                     const pp = ppId ? passepartout.find((x) => x.id === ppId) : null;
-                                    updateFrame(frameIndex, {
+                                    updatePassepartout(ppIndex, {
                                       passepartout_id: ppId,
                                       passepartout_image: pp?.image || null,
                                     });
@@ -774,54 +854,61 @@ export const Wizard = () => {
                                     </option>
                                   ))}
                                 </select>
-                                {frame.passepartout_id && (
-                                  <>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Длина паспарту (см)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0.01"
-                                        value={frame.passepartout_length || ''}
-                                        onChange={(e) => {
-                                          const newLength = e.target.value;
-                                          updateFrame(frameIndex, {
-                                            passepartout_length: newLength && parseFloat(newLength) > 0 ? parseFloat(newLength) : null,
-                                          });
-                                        }}
-                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                        placeholder="Введите длину паспарту"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Ширина паспарту (см)
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0.01"
-                                        value={frame.passepartout_width || ''}
-                                        onChange={(e) => {
-                                          const newWidth = e.target.value;
-                                          updateFrame(frameIndex, {
-                                            passepartout_width: newWidth && parseFloat(newWidth) > 0 ? parseFloat(newWidth) : null,
-                                          });
-                                        }}
-                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                        placeholder="Введите ширину паспарту"
-                                      />
-                                    </div>
-                                  </>
-                                )}
+
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Длина паспарту (см)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={ppData.passepartout_length || ''}
+                                    onChange={(e) => {
+                                      const newLength = e.target.value;
+                                      updatePassepartout(ppIndex, {
+                                        passepartout_length: newLength && parseFloat(newLength) > 0 ? parseFloat(newLength) : null,
+                                      });
+                                    }}
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                    placeholder="Введите длину паспарту"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Ширина паспарту (см)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={ppData.passepartout_width || ''}
+                                    onChange={(e) => {
+                                      const newWidth = e.target.value;
+                                      updatePassepartout(ppIndex, {
+                                        passepartout_width: newWidth && parseFloat(newWidth) > 0 ? parseFloat(newWidth) : null,
+                                      });
+                                    }}
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                    placeholder="Введите ширину паспарту"
+                                  />
+                                </div>
                               </div>
                             </div>
+                          ))}
 
-                          </div>
+                          {passepartoutsData.length < 3 && (
+                            <button
+                              type="button"
+                              onClick={addPassepartout}
+                              className="wizard-button-add px-4 py-2 font-semibold"
+                            >
+                              + Добавить паспарту
+                            </button>
+                          )}
                         </div>
-                      ))}
+                      </div>
 
                       {/* Молдинг — после рамы и паспарту */}
                       <div className="wizard-section p-6">
@@ -883,19 +970,6 @@ export const Wizard = () => {
                         </div>
                       </div>
 
-                      {/* Кнопка добавления рамы */}
-                      {frames.length < 3 && (
-                        <div className="flex justify-center">
-                          <button
-                            type="button"
-                            onClick={addFrame}
-                            className="wizard-button-add px-6 py-3 font-semibold"
-                          >
-                            + Добавить раму
-                          </button>
-                        </div>
-                      )}
-
                       {errors.frames && (
                         <div className="wizard-error p-4">
                           <p className="text-sm text-red-600">{errors.frames}</p>
@@ -920,8 +994,8 @@ export const Wizard = () => {
                         </div>
                         <div className="ml-3">
                           <p className="text-sm text-blue-700">
-                            Введите размеры вашей картины в сантиметрах, выберите багет и паспарту для каждой рамы (можно добавить до 3 рам).
-                            При необходимости укажите молдинг. На основе этих данных будет рассчитано количество необходимых материалов.
+                            Введите размеры картины, выберите рамы (до 3), затем добавьте паспарту отдельно (до 3, независимо от числа рам).
+                            При необходимости укажите молдинг. На основе этих данных будет рассчитано количество материалов.
                           </p>
                         </div>
                       </div>
@@ -1138,7 +1212,7 @@ export const Wizard = () => {
                                 // Сразу обновляем orderData для пересчета цены
                                 updateOrderData({
                                   trosik_id: newTrosikId ? parseInt(newTrosikId) : null,
-                                  trosik_length: newTrosikId ? parseFloat(trosikLength || x2 || 0) : null,
+                                  trosik_length: newTrosikId ? parseFloat(trosikLength || x2 || 0) / 100 : null,
                                 });
                               }}
                               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
@@ -1154,7 +1228,7 @@ export const Wizard = () => {
                           {trosikId && (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Длина тросика (м) <span className="text-gray-500 text-xs">(равна ширине картины)</span>
+                                Длина тросика (см) <span className="text-gray-500 text-xs">(равна ширине картины)</span>
                               </label>
                               <input
                                 type="number"
@@ -1163,11 +1237,11 @@ export const Wizard = () => {
                                 value={trosikLength || x2 || ''}
                                 onChange={(e) => setTrosikLength(e.target.value)}
                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition bg-gray-50"
-                                placeholder={x2 ? `Ширина картины: ${x2} м` : 'Введите ширину картины'}
+                                placeholder={x2 ? `Ширина картины: ${x2} см` : 'Введите ширину картины'}
                                 readOnly
                               />
                               <p className="mt-1 text-xs text-gray-500">
-                                Длина тросика автоматически равна ширине картины ({x2 || 'не указана'} м)
+                                Длина тросика автоматически равна ширине картины ({x2 || 'не указана'} см)
                               </p>
                             </div>
                           )}

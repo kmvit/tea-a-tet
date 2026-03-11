@@ -24,13 +24,10 @@ export const OrderProvider = ({ children }) => {
         baguette_id: null,
         baguette_image: null,
         baguette_width: null,
-        passepartout_id: null,
-        passepartout_image: null,
-        passepartout_length: null,
-        passepartout_width: null,
         work_id: null,
       }
     ],
+    passepartouts: [],
     // Шаг 2: Стекло, подкладка и натяжка
     glass_id: null,
     backing_id: null,
@@ -99,6 +96,7 @@ export const OrderProvider = ({ children }) => {
           x1: f.x1 ?? x1Val,
           x2: f.x2 ?? x2Val,
         }));
+        dataToSend.passepartouts = orderData.passepartouts || [];
       } else {
         // Обратная совместимость: если нет массива, но есть старые поля
         if (orderData.baguette_id) {
@@ -130,12 +128,10 @@ export const OrderProvider = ({ children }) => {
           baguette_id: null,
           baguette_image: null,
           baguette_width: null,
-          passepartout_id: null,
-          passepartout_length: null,
-          passepartout_width: null,
           work_id: null,
         }
       ],
+      passepartouts: [],
       glass_id: null,
       backing_id: null,
       stretch_id: null,

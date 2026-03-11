@@ -26,20 +26,22 @@ export const FramePreview = ({ showLabel = true }) => {
     return { x1: parseFloat(x1) || 30, x2: parseFloat(x2) || 20 };
   };
 
-  // Собираем все слои вложенно: для каждой рамы — паспарту (если есть), затем багет
-  // Как в frame-tool3: первый слой вокруг картины, второй вокруг первого, третий вокруг второго и т.д.
+  // Собираем слои вложенно: сначала все паспарту, затем все рамы.
   const getAllLayers = () => {
     const frames = orderData.frames || [];
+    const passepartouts = orderData.passepartouts || [];
     const layers = [];
-    for (const frame of frames) {
-      if (frame?.passepartout_id) {
+    for (const pp of passepartouts) {
+      if (pp?.passepartout_id) {
         layers.push({
           type: 'passepartout',
           width: 25,
           color: PASSEPARTOUT_COLOR,
-          image: frame?.passepartout_image || null,
+          image: pp?.passepartout_image || null,
         });
       }
+    }
+    for (const frame of frames) {
       if ((frame?.baguette_id && frame?.baguette_image) || (orderData.baguette_id && orderData.baguette_image)) {
         const img = frame?.baguette_image || orderData.baguette_image;
         const w = frame?.baguette_width ?? orderData.baguette_width;
@@ -160,7 +162,10 @@ export const FramePreview = ({ showLabel = true }) => {
     const maxWidth = container ? container.clientWidth - 20 : 400;
     const maxHeight = 400;
     const layers = getAllLayers();
-    const hasBaguetteOrPp = (orderData.frames && orderData.frames.some((f) => f.baguette_id || f.passepartout_id)) || orderData.baguette_id;
+    const hasBaguetteOrPp =
+      (orderData.frames && orderData.frames.some((f) => f.baguette_id)) ||
+      (orderData.passepartouts && orderData.passepartouts.some((pp) => pp.passepartout_id)) ||
+      orderData.baguette_id;
     if (!hasBaguetteOrPp) return;
     const { x1, x2 } = getPaintingDimensions();
     const aspectRatio = x1 / x2;
@@ -293,28 +298,31 @@ export const FramePreview = ({ showLabel = true }) => {
   useEffect(() => {
     const hasData =
       (orderData.x1 && orderData.x2) ||
-      (orderData.frames && orderData.frames.some((f) => f.baguette_id || f.passepartout_id || (f.x1 && f.x2))) ||
+      (orderData.frames && orderData.frames.some((f) => f.baguette_id || (f.x1 && f.x2))) ||
+      (orderData.passepartouts && orderData.passepartouts.some((pp) => pp.passepartout_id)) ||
       orderData.baguette_id;
     if (hasData) {
       const timeout = setTimeout(drawFrame, 100);
       return () => clearTimeout(timeout);
     }
-  }, [orderData.x1, orderData.x2, orderData.frames, orderData.baguette_id, orderData.baguette_image, paintingImage]);
+  }, [orderData.x1, orderData.x2, orderData.frames, orderData.passepartouts, orderData.baguette_id, orderData.baguette_image, paintingImage]);
 
   useEffect(() => {
     const handleResize = () => {
       const hasData =
         (orderData.x1 && orderData.x2) ||
-        (orderData.frames && orderData.frames.some((f) => f.baguette_id || f.passepartout_id || (f.x1 && f.x2)));
+        (orderData.frames && orderData.frames.some((f) => f.baguette_id || (f.x1 && f.x2))) ||
+        (orderData.passepartouts && orderData.passepartouts.some((pp) => pp.passepartout_id));
       if (hasData) setTimeout(drawFrame, 100);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [orderData.x1, orderData.x2, orderData.frames, orderData.baguette_id]);
+  }, [orderData.x1, orderData.x2, orderData.frames, orderData.passepartouts, orderData.baguette_id]);
 
   const hasData =
     (orderData.x1 && orderData.x2) ||
-    (orderData.frames && orderData.frames.some((f) => f.baguette_id || f.passepartout_id || (f.x1 && f.x2))) ||
+    (orderData.frames && orderData.frames.some((f) => f.baguette_id || (f.x1 && f.x2))) ||
+    (orderData.passepartouts && orderData.passepartouts.some((pp) => pp.passepartout_id)) ||
     orderData.baguette_id;
 
   return (

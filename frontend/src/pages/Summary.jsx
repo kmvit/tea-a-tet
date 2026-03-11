@@ -39,13 +39,11 @@ export const Summary = () => {
       if (orderData.frames && orderData.frames.length > 0) {
         dataToSend.frames = orderData.frames.map(frame => ({
           baguette_id: frame.baguette_id,
-          passepartout_id: frame.passepartout_id,
-          passepartout_length: frame.passepartout_length,
-          passepartout_width: frame.passepartout_width,
           work_id: frame.work_id,
           x1: frame.x1,
           x2: frame.x2,
         }));
+        dataToSend.passepartouts = orderData.passepartouts || [];
       } else {
         if (orderData.baguette_id) {
           dataToSend.baguette_id = orderData.baguette_id;
