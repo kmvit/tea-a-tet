@@ -99,6 +99,32 @@ export const Wizard = () => {
   const [paymentMethod, setPaymentMethod] = useState(orderData.payment_method || 'наличные');
   const [advancePayment, setAdvancePayment] = useState(orderData.advance_payment || '');
 
+  // --- Автоподстановка размеров (ТЗ) ---
+  // Внешний размер паспарту, размеры Рам 2/3 и расход молдинга подставляются
+  // автоматически, но остаются редактируемыми. Флаги ниже фиксируют ручное
+  // переопределение, чтобы авто-пересчёт не затирал введённое мастером значение.
+  const [frameSizeManual, setFrameSizeManual] = useState(
+    frames.map(() => ({ x1: false, x2: false }))
+  );
+  const [ppOuterManual, setPpOuterManual] = useState(
+    passepartoutsData.map(() => ({ len: false, wid: false }))
+  );
+  const [moldingManual, setMoldingManual] = useState(!!moldingConsumption);
+
+  const round2 = (v) => Math.round(v * 100) / 100;
+  // Ширина багета хранится в метрах — переводим в сантиметры
+  const frameWidthCm = (f) => {
+    const w = parseFloat(f?.baguette_width);
+    return Number.isNaN(w) ? 0 : w * 100;
+  };
+  // Размер картины = внутренний размер первой рамы
+  const getPictureSize = (framesArr) => {
+    if (framesArr.length > 1) {
+      return { x1: parseFloat(framesArr[0]?.x1), x2: parseFloat(framesArr[0]?.x2) };
+    }
+    return { x1: parseFloat(x1), x2: parseFloat(x2) };
+  };
+
   // Загрузка всех данных при монтировании
   useEffect(() => {
     const fetchAllData = async () => {
@@ -276,6 +302,75 @@ export const Wizard = () => {
     }
   }, [trosikId, x2]);
 
+  // Авто-размеры Рам 2/3: внутренний размер рамы = внешний размер предыдущей рамы
+  // (размер предыдущей рамы + 2 × ширина её багета). Пересчитывается, пока мастер
+  // не переопределил значение вручную.
+  useEffect(() => {
+    if (frames.length < 2) return;
+    let changed = false;
+    const next = frames.map((f) => ({ ...f }));
+    for (let i = 1; i < next.length; i++) {
+      const prev = next[i - 1];
+      const wCm = frameWidthCm(prev);
+      const pix1 = parseFloat(prev.x1);
+      const pix2 = parseFloat(prev.x2);
+      const m = frameSizeManual[i] || {};
+      if (!m.x1 && !Number.isNaN(pix1)) {
+        const v = round2(pix1 + 2 * wCm);
+        if (parseFloat(next[i].x1) !== v) { next[i].x1 = v; changed = true; }
+      }
+      if (!m.x2 && !Number.isNaN(pix2)) {
+        const v = round2(pix2 + 2 * wCm);
+        if (parseFloat(next[i].x2) !== v) { next[i].x2 = v; changed = true; }
+      }
+    }
+    if (changed) {
+      setFrames(next);
+      updateOrderData({ frames: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frames, frameSizeManual]);
+
+  // Авто-внешний размер паспарту = размер картины (X1 × X2). Окно вводится вручную.
+  useEffect(() => {
+    if (passepartoutsData.length === 0) return;
+    const pic = getPictureSize(frames);
+    if (Number.isNaN(pic.x1) || Number.isNaN(pic.x2)) return;
+    let changed = false;
+    const next = passepartoutsData.map((pp) => ({ ...pp }));
+    next.forEach((pp, i) => {
+      const m = ppOuterManual[i] || {};
+      if (!m.len && parseFloat(pp.passepartout_length) !== pic.x1) {
+        pp.passepartout_length = pic.x1;
+        changed = true;
+      }
+      if (!m.wid && parseFloat(pp.passepartout_width) !== pic.x2) {
+        pp.passepartout_width = pic.x2;
+        changed = true;
+      }
+    });
+    if (changed) {
+      setPassepartoutsData(next);
+      updateOrderData({ passepartouts: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passepartoutsData, ppOuterManual, frames, x1, x2]);
+
+  // Авто-расход молдинга = периметр окна паспарту: 2 × (длина_окна + ширина_окна), в метрах.
+  useEffect(() => {
+    if (moldingManual || !moldingId) return;
+    const pp = passepartoutsData.find(
+      (p) => parseFloat(p.window_length) > 0 && parseFloat(p.window_width) > 0
+    );
+    if (!pp) return;
+    const cons = round2((2 * (parseFloat(pp.window_length) + parseFloat(pp.window_width))) / 100);
+    if (parseFloat(moldingConsumption) !== cons) {
+      setMoldingConsumption(String(cons));
+      updateOrderData({ molding_consumption: cons });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passepartoutsData, moldingManual, moldingId]);
+
   // Обработчики для каждого шага
   // Шаг 1: Размеры и рамки (багет + паспарту)
   const handleStep1Submit = (e) => {
@@ -344,9 +439,16 @@ export const Wizard = () => {
         baguette_name: null,
         work_id: null,
       };
-      const newFrames = [...frames, newFrame];
+      const base = [...frames];
+      // При переходе с одной рамы на несколько переносим размер картины в Раму 1
+      if (base.length === 1) {
+        if (base[0].x1 == null && x1) base[0] = { ...base[0], x1: parseFloat(x1) };
+        if (base[0].x2 == null && x2) base[0] = { ...base[0], x2: parseFloat(x2) };
+      }
+      const newFrames = [...base, newFrame];
       setFrames(newFrames);
       setBaguetteSearches([...baguetteSearches, '']);
+      setFrameSizeManual([...frameSizeManual, { x1: false, x2: false }]);
       updateOrderData({ frames: newFrames });
     }
   };
@@ -358,9 +460,20 @@ export const Wizard = () => {
       setFrames(newFrames);
       const newSearches = baguetteSearches.filter((_, i) => i !== index);
       setBaguetteSearches(newSearches);
+      setFrameSizeManual(frameSizeManual.filter((_, i) => i !== index));
       // Обновляем orderData
       updateOrderData({ frames: newFrames });
     }
+  };
+
+  // Пометить размер рамы как введённый вручную (или снять пометку при очистке поля)
+  const setFrameSizeManualFlag = (index, key, manual) => {
+    setFrameSizeManual((prev) => {
+      const next = prev.map((m) => ({ ...m }));
+      while (next.length <= index) next.push({ x1: false, x2: false });
+      next[index] = { ...next[index], [key]: manual };
+      return next;
+    });
   };
 
   // Обновление рамы
@@ -394,9 +507,12 @@ export const Wizard = () => {
           passepartout_image: null,
           passepartout_length: null,
           passepartout_width: null,
+          window_length: null,
+          window_width: null,
         },
       ];
       setPassepartoutsData(newPps);
+      setPpOuterManual([...ppOuterManual, { len: false, wid: false }]);
       updateOrderData({ passepartouts: newPps });
     }
   };
@@ -404,7 +520,18 @@ export const Wizard = () => {
   const removePassepartout = (index) => {
     const newPps = passepartoutsData.filter((_, i) => i !== index);
     setPassepartoutsData(newPps);
+    setPpOuterManual(ppOuterManual.filter((_, i) => i !== index));
     updateOrderData({ passepartouts: newPps });
+  };
+
+  // Пометить внешний размер паспарту как введённый вручную (или снять при очистке)
+  const setPpOuterManualFlag = (index, key, manual) => {
+    setPpOuterManual((prev) => {
+      const next = prev.map((m) => ({ ...m }));
+      while (next.length <= index) next.push({ len: false, wid: false });
+      next[index] = { ...next[index], [key]: manual };
+      return next;
+    });
   };
 
   const updatePassepartout = (index, updates) => {
@@ -648,7 +775,13 @@ export const Wizard = () => {
 
                           {/* Размеры рамы — при нескольких рамах у каждой свои размеры */}
                           {frames.length > 1 && (
-                            <div className="mb-6 grid grid-cols-2 gap-4">
+                            <div className="mb-6">
+                              {frameIndex > 0 && (
+                                <p className="mb-2 text-xs text-gray-500">
+                                  Размер подставляется автоматически из Рамы {frameIndex} и ширины её багета. При необходимости можно изменить вручную.
+                                </p>
+                              )}
+                              <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Размер X1 (см)
@@ -663,6 +796,7 @@ export const Wizard = () => {
                                     updateFrame(frameIndex, {
                                       x1: v && parseFloat(v) > 0 ? parseFloat(v) : null,
                                     });
+                                    setFrameSizeManualFlag(frameIndex, 'x1', v !== '');
                                     setErrors({ ...errors, [`frame_${frameIndex}_x1`]: null });
                                   }}
                                   className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
@@ -692,6 +826,7 @@ export const Wizard = () => {
                                     updateFrame(frameIndex, {
                                       x2: v && parseFloat(v) > 0 ? parseFloat(v) : null,
                                     });
+                                    setFrameSizeManualFlag(frameIndex, 'x2', v !== '');
                                     setErrors({ ...errors, [`frame_${frameIndex}_x2`]: null });
                                   }}
                                   className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
@@ -706,6 +841,7 @@ export const Wizard = () => {
                                     {errors[`frame_${frameIndex}_x2`]}
                                   </p>
                                 )}
+                              </div>
                               </div>
                             </div>
                           )}
@@ -855,44 +991,94 @@ export const Wizard = () => {
                                   ))}
                                 </select>
 
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Длина паспарту (см)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={ppData.passepartout_length || ''}
-                                    onChange={(e) => {
-                                      const newLength = e.target.value;
-                                      updatePassepartout(ppIndex, {
-                                        passepartout_length: newLength && parseFloat(newLength) > 0 ? parseFloat(newLength) : null,
-                                      });
-                                    }}
-                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                    placeholder="Введите длину паспарту"
-                                  />
+                                <p className="text-xs text-gray-500">
+                                  Внешний размер подставляется автоматически из размера картины. Вручную вводится только размер окна.
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Внешняя длина (см)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.01"
+                                      value={ppData.passepartout_length ?? ''}
+                                      onChange={(e) => {
+                                        const newLength = e.target.value;
+                                        updatePassepartout(ppIndex, {
+                                          passepartout_length: newLength && parseFloat(newLength) > 0 ? parseFloat(newLength) : null,
+                                        });
+                                        setPpOuterManualFlag(ppIndex, 'len', newLength !== '');
+                                      }}
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      placeholder="авто = размер картины"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Внешняя ширина (см)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.01"
+                                      value={ppData.passepartout_width ?? ''}
+                                      onChange={(e) => {
+                                        const newWidth = e.target.value;
+                                        updatePassepartout(ppIndex, {
+                                          passepartout_width: newWidth && parseFloat(newWidth) > 0 ? parseFloat(newWidth) : null,
+                                        });
+                                        setPpOuterManualFlag(ppIndex, 'wid', newWidth !== '');
+                                      }}
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      placeholder="авто = размер картины"
+                                    />
+                                  </div>
                                 </div>
 
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Ширина паспарту (см)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={ppData.passepartout_width || ''}
-                                    onChange={(e) => {
-                                      const newWidth = e.target.value;
-                                      updatePassepartout(ppIndex, {
-                                        passepartout_width: newWidth && parseFloat(newWidth) > 0 ? parseFloat(newWidth) : null,
-                                      });
-                                    }}
-                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                    placeholder="Введите ширину паспарту"
-                                  />
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Окно: длина (см)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.01"
+                                      value={ppData.window_length ?? ''}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        updatePassepartout(ppIndex, {
+                                          window_length: v && parseFloat(v) > 0 ? parseFloat(v) : null,
+                                        });
+                                      }}
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      placeholder="Длина окна"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                      Окно: ширина (см)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0.01"
+                                      value={ppData.window_width ?? ''}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        updatePassepartout(ppIndex, {
+                                          window_width: v && parseFloat(v) > 0 ? parseFloat(v) : null,
+                                        });
+                                      }}
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      placeholder="Ширина окна"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -956,15 +1142,17 @@ export const Wizard = () => {
                                 onChange={(e) => {
                                   const newConsumption = e.target.value;
                                   setMoldingConsumption(newConsumption);
-                                  if (moldingId && newConsumption) {
-                                    updateOrderData({
-                                      molding_consumption: parseFloat(newConsumption),
-                                    });
-                                  }
+                                  setMoldingManual(newConsumption !== '');
+                                  updateOrderData({
+                                    molding_consumption: newConsumption ? parseFloat(newConsumption) : null,
+                                  });
                                 }}
                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                                placeholder="Расход в метрах"
+                                placeholder="авто = периметр окна паспарту"
                               />
+                              <p className="mt-1 text-xs text-gray-500">
+                                Подставляется автоматически по периметру окна паспарту. При необходимости можно изменить вручную.
+                              </p>
                             </div>
                           )}
                         </div>

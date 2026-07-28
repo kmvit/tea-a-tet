@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npm run *)",
+      "Read(//tmp/claude-501/-Users-home-PycharmProjects-tet-a-tet/2acac75a-6f06-4e45-9ead-6cfe71870979/scratchpad/**)"
+    ]
+  }
+}
