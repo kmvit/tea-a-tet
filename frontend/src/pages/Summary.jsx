@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
 import { createOrder } from '../api';
 import { ProgressBar } from '../components/ProgressBar';
+import { WorksPanel } from '../components/WorksPanel';
 
 export const Summary = () => {
   const navigate = useNavigate();
@@ -39,7 +40,6 @@ export const Summary = () => {
       if (orderData.frames && orderData.frames.length > 0) {
         dataToSend.frames = orderData.frames.map(frame => ({
           baguette_id: frame.baguette_id,
-          work_id: frame.work_id,
           x1: frame.x1,
           x2: frame.x2,
         }));
@@ -153,6 +153,10 @@ export const Summary = () => {
                     )}
                   </div>
                 </div>
+              )}
+
+              {priceCalculation?.works && (
+                <WorksPanel works={priceCalculation.works} />
               )}
 
               <div className="border-t-2 border-gray-300 pt-4">

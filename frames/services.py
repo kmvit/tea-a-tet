@@ -1,24 +1,27 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Optional, List, Any
 from django.db.models import F
 
-from .models import Baguette, Glass, Backing, Hardware, Podramnik, Package, Molding, Trosik, Podveski, Material, Passepartout, Stretch, Work, WorkPriceSettings
+from .models import Baguette, Glass, Backing, Hardware, Podramnik, Package, Molding, Trosik, Podveski, Material, Passepartout, Stretch, TechOperation, Foamboard
+
+
+def _dec(value, default='0') -> Decimal:
+    if value is None or value == '':
+        return Decimal(default)
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal(default)
+
+
+def _okr(value) -> int:
+    """Аналог 1С Окр(): округление до целого (half-up)."""
+    return int(_dec(value).to_integral_value(rounding=ROUND_HALF_UP))
 
 
 class PriceCalculator:
     """Класс для расчета стоимости заказа на раму"""
-    
-    @staticmethod
-    def is_small_frame(x1: Decimal, x2: Decimal) -> bool:
-        """
-        Определяет, является ли рама малой в соответствии с настройками
-        Рама считается малой, если обе стороны не превышают пороговые значения
-        (x1 <= max_x1 И x2 <= max_x2) ИЛИ (x1 <= max_x2 И x2 <= max_x1)
-        """
-        settings = WorkPriceSettings.get_settings()
-        return ((x1 <= settings.max_size_x1 and x2 <= settings.max_size_x2) or
-                (x1 <= settings.max_size_x2 and x2 <= settings.max_size_x1))
-    
+
     @staticmethod
     def calculate_baguette_quantity(x1: Decimal, x2: Decimal, width: Decimal) -> Decimal:
         """
@@ -284,49 +287,224 @@ class PriceCalculator:
                 result['total_price'] += stretch_calc['total_price']
                 selected_material_types.append('stretch')
             
-            # Работы - автоматически добавляем работы для выбранных материалов
-            settings = WorkPriceSettings.get_settings()
-            is_small = PriceCalculator.is_small_frame(x1, x2)
-            
-            # Если передан конкретный work_id, используем его
-            if work_id:
-                work = Work.objects.get(pk=work_id)
-                work_price = work.price if is_small else work.price * settings.multiplier_for_large
-                
-                result['components']['work'] = {
-                    'name': work.name,
-                    'base_price': float(work.price),
-                    'is_small_frame': is_small,
-                    'multiplier': 1.0 if is_small else float(settings.multiplier_for_large),
-                    'total_price': float(work_price)
-                }
-                result['total_price'] += work_price
-            else:
-                # Автоматически находим и добавляем работы для выбранных материалов
-                auto_works = Work.objects.filter(material_type__in=selected_material_types)
-                
-                for idx, work in enumerate(auto_works):
-                    work_price = work.price if is_small else work.price * settings.multiplier_for_large
-                    
-                    # Если несколько работ, добавляем индекс к ключу
-                    work_key = 'work' if idx == 0 else f'work_{idx+1}'
-                    
-                    result['components'][work_key] = {
-                        'name': work.name,
-                        'material_type': work.material_type,
-                        'base_price': float(work.price),
-                        'is_small_frame': is_small,
-                        'multiplier': 1.0 if is_small else float(settings.multiplier_for_large),
-                        'total_price': float(work_price)
-                    }
-                    result['total_price'] += work_price
-            
+            # Работы больше НЕ входят в цену: технологические операции считаются
+            # справочно в OrderExtrasCalculator (по данным 1С), а стоимость сборки
+            # учитывается через «Сложность рамы/паспарту/крепления». Параметры
+            # work_id / selected_material_types оставлены для обратной совместимости
+            # входных данных, но на цену не влияют.
+            _ = (work_id, selected_material_types)
+
             result['total_price'] = float(result['total_price'])
             
         except Exception as e:
             result['error'] = str(e)
         
         return result
+
+
+class OrderExtrasCalculator:
+    """
+    Автосложность (входит в цену) и технологические операции / «работы» (справочно).
+
+    Повторяет логику 1С: Расчет() (блок сложности) и ЗаполнитьРаботу().
+    Сложность рамы/паспарту/крепления добавляется в цену заказа.
+    Работы подбираются по диапазону размеров (макс. стороны рамы 1) либо по спец-формуле
+    и НЕ входят в цену — считаются справочно (сумма расценок + время = Σрасценка / 100).
+    """
+
+    @staticmethod
+    def _frame_infos(frames: List[Dict], gx1: Decimal, gx2: Decimal, data: Dict) -> List[Dict]:
+        fr = [f for f in (frames or []) if f.get('baguette_id')]
+        if not fr and data.get('baguette_id'):
+            fr = [{'baguette_id': data['baguette_id'], 'x1': gx1, 'x2': gx2}]
+        infos = []
+        for f in fr:
+            fx1 = _dec(f.get('x1') or gx1)
+            fx2 = _dec(f.get('x2') or gx2)
+            if fx1 <= 0 or fx2 <= 0:
+                fx1, fx2 = gx1, gx2
+            baguette = Baguette.objects.filter(pk=f['baguette_id']).first()
+            width = baguette.width if baguette else Decimal('0')
+            infos.append({'x1': fx1, 'x2': fx2, 'width': width, 'max': max(fx1, fx2)})
+        return infos
+
+    @classmethod
+    def compute(cls, *, frames, passepartouts, x1, x2, data) -> Dict[str, Any]:
+        gx1, gx2 = _dec(x1), _dec(x2)
+        q = int(data.get('quantity') or 1) or 1
+        infos = cls._frame_infos(frames, gx1, gx2, data)
+        n = len(infos)
+
+        # Опорный размер рамы 1 (макс(бд1, бш1)) — для сложности и подбора работ паспарту/стекла/подкладки.
+        if infos:
+            b1x, b1y = infos[0]['x1'], infos[0]['x2']
+        else:
+            b1x, b1y = gx1, gx2
+        base_max = max(b1x, b1y)
+
+        # ---------- Сложность рамы (СложностьР) ----------
+        R1 = (infos[0]['width'] * 2000) if n >= 1 else Decimal('0')
+        R2 = (infos[1]['width'] * 2000) if n >= 2 else Decimal('0')
+        R3 = (infos[2]['width'] * 2000) if n >= 3 else Decimal('0')
+        R4 = Decimal('50') if (n >= 1 and (b1x < 15 or b1y < 15)) else Decimal('0')
+
+        hw_qty = _dec(data.get('hardware_quantity'))
+        F_ = (hw_qty * 10) if (data.get('hardware_id') and hw_qty > 0) else Decimal('0')
+
+        RB = R1 + R2 + R3 + R4 + F_
+
+        def bump(v120, v75):
+            if b1x >= 120 or b1y >= 120:
+                return Decimal(v120)
+            if b1x >= 75 or b1y >= 75:
+                return Decimal(v75)
+            return Decimal('0')
+
+        if data.get('backing_id'):
+            RB += bump('50', '30')
+        if data.get('foamboard_id'):
+            RB += bump('50', '30')
+        if data.get('glass_id'):
+            RB += bump('100', '60')
+        if data.get('podramnik_id'):
+            if b1x >= 160 or b1y >= 160:
+                RB += Decimal('120')
+            elif b1x >= 120 or b1y >= 120:
+                RB += Decimal('100')
+            elif b1x >= 80 or b1y >= 80:
+                RB += Decimal('80')
+            else:
+                RB += Decimal('60')
+
+        RD = _dec(data.get('extra_frame_complexity'))
+        compR = Decimal('100')
+        if RB > 0 and RD > 0:
+            compR = 100 + RB + RD
+        elif RB == 0 and RD > 0:
+            compR = 100 + RD
+        elif RB > 0 and RD == 0:
+            compR = 100 + RB
+
+        # ---------- Сложность паспарту (СложностьП) ----------
+        npp = len([p for p in (passepartouts or []) if p.get('passepartout_id')])
+        P2 = Decimal('40') if npp >= 3 else Decimal('0')
+        P1 = Decimal('30') if npp >= 2 else Decimal('0')
+        windows = int(data.get('passepartout_windows') or 0)
+        Pkop = Decimal(windows * 30) if windows > 1 else Decimal('0')
+        PP = P1 + P2 + Pkop
+        PD = _dec(data.get('extra_pp_complexity'))
+        compP = Decimal('0')
+        if PD > 0 and PP > 0:
+            compP = PD + PP
+        elif PD == 0 and PP > 0:
+            compP = PP
+        elif PD > 0 and PP == 0:
+            compP = PD
+
+        # ---------- Сложность крепления объекта (СложностьКрОбТ) ----------
+        mount = int(data.get('mount_count') or 0)
+        compMount = Decimal(mount * 20) if mount > 0 else Decimal('0')
+
+        # ---------- Работы (справочно) ----------
+        works: List[Dict] = []
+
+        def add_work(op_type, size, label=None, rate_override=None):
+            if rate_override is not None:
+                rate = _dec(rate_override)
+                name = label or op_type
+            else:
+                op = TechOperation.find_by_size(op_type, size)
+                if not op or op.rate is None:
+                    return
+                rate = op.rate
+                name = label or op.name
+            total = rate * q
+            works.append({
+                'operation_type': op_type,
+                'name': name,
+                'rate': float(rate),
+                'quantity': q,
+                'total': float(total),
+            })
+
+        # Рама: тип работы = число рам (1→рама, 2→двойная, 3→тройная), размер внешней рамы
+        if n == 1:
+            add_work('rama', infos[0]['max'])
+        elif n == 2:
+            add_work('rama2', infos[1]['max'])
+        elif n >= 3:
+            add_work('rama3', infos[2]['max'])
+
+        # Паспарту 1/2/3 — по опорному размеру рамы 1
+        pp_types = ['passepartout', 'passepartout2', 'passepartout3']
+        pp_list = [p for p in (passepartouts or []) if p.get('passepartout_id')]
+        for i, _p in enumerate(pp_list[:3]):
+            add_work(pp_types[i], base_max)
+
+        if data.get('backing_id'):
+            add_work('backing', base_max)
+        if data.get('glass_id'):
+            add_work('glass', base_max)
+        if data.get('podramnik_id'):
+            add_work('podramnik', base_max)
+        if data.get('foamboard_id'):
+            add_work('foamboard', base_max)
+        if data.get('molding_id'):
+            add_work('molding', 0)  # фиксированная расценка
+
+        # Натяжка: расценка = Окр(цена_натяжки * 45 / 100)
+        if data.get('stretch_id'):
+            stretch = Stretch.objects.filter(pk=data['stretch_id']).first()
+            if stretch:
+                area = PriceCalculator.calculate_glass_area(gx1, gx2)
+                price_nat = area * stretch.price_per_sqm
+                add_work('stretch', 0, label='Натяжка', rate_override=_okr(price_nat * 45 / 100))
+
+        # Упаковка: расценка = Окр(цена_упаковки / 2)
+        if data.get('package_id'):
+            package = Package.objects.filter(pk=data['package_id']).first()
+            if package:
+                add_work('package', 0, label='Упаковка', rate_override=_okr(package.price / 2))
+
+        # Сложности как работы = сложность / 2
+        if compR > 0:
+            add_work('complexity_frame', 0, label='Сложность рамы', rate_override=_okr(compR / 2))
+        if compP > 0:
+            add_work('complexity_pp', 0, label='Сложность паспарту', rate_override=_okr(compP / 2))
+        if compMount > 0:
+            add_work('complexity_mount', 0, label='Сложность крепления', rate_override=_okr(compMount / 2))
+
+        total_rate = sum(w['total'] for w in works)
+
+        return {
+            'complexity': {
+                'frame': float(compR * q),
+                'passepartout': float(compP * q),
+                'mount': float(compMount * q),
+                'total': float((compR + compP + compMount) * q),
+            },
+            'works': {
+                'items': works,
+                'total_rate': float(total_rate),
+                'work_time_hours': round(total_rate / 100, 2),
+            },
+        }
+
+    @staticmethod
+    def apply(calculation: Dict, extras: Dict) -> Dict:
+        """Добавляет сложность в цену и прикрепляет блок работ (справочно) к расчёту."""
+        comp = extras['complexity']
+        components = calculation.setdefault('components', {})
+        for key, label, val in (
+            ('complexity_frame', 'Сложность рамы', comp['frame']),
+            ('complexity_pp', 'Сложность паспарту', comp['passepartout']),
+            ('complexity_mount', 'Сложность крепления', comp['mount']),
+        ):
+            if val > 0:
+                components[key] = {'name': label, 'total_price': val}
+        calculation['total_price'] = float(calculation.get('total_price', 0)) + comp['total']
+        calculation['works'] = extras['works']
+        return calculation
 
 
 class StockDeduction:

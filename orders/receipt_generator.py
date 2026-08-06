@@ -347,7 +347,6 @@ def generate_receipt_word(order_id):
             passepartout_id=order.passepartout.id if order.passepartout else None,
             passepartout_length=order.passepartout_length,
             passepartout_width=order.passepartout_width,
-            work_id=order.work.id if order.work else None,
         )
     
     # Создаем таблицу с деталями заказа
@@ -729,7 +728,6 @@ def generate_receipt_html(order_id):
             passepartout_id=order.passepartout.id if order.passepartout else None,
             passepartout_length=order.passepartout_length,
             passepartout_width=order.passepartout_width,
-            work_id=order.work.id if order.work else None,
         )
 
     frame_count = len(frames) if frames else 1

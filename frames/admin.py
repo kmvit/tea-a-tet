@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     Baguette, Glass, Backing, Hardware, Podramnik, Package,
-    Molding, Trosik, Podveski, Material, Passepartout, Stretch, Work, WorkPriceSettings
+    Molding, Trosik, Podveski, Material, Passepartout, Stretch,
+    Foamboard, TechOperation
 )
 
 
@@ -111,48 +112,18 @@ class StretchAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at']
 
 
-@admin.register(Work)
-class WorkAdmin(admin.ModelAdmin):
-    list_display = ['name', 'price', 'material_type', 'created_at']
-    list_filter = ['material_type', 'created_at']
+@admin.register(Foamboard)
+class FoamboardAdmin(admin.ModelAdmin):
+    list_display = ['name', 'price', 'stock_quantity', 'created_at']
     search_fields = ['name']
     readonly_fields = ['created_at']
-    
-    fieldsets = (
-        ('Основная информация', {
-            'fields': ('name', 'price', 'material_type')
-        }),
-        ('Системная информация', {
-            'fields': ('created_at',),
-            'classes': ('collapse',)
-        }),
-    )
 
 
-@admin.register(WorkPriceSettings)
-class WorkPriceSettingsAdmin(admin.ModelAdmin):
-    list_display = ['max_size_x1', 'max_size_x2', 'multiplier_for_large', 'updated_at']
-    readonly_fields = ['created_at', 'updated_at']
-    
-    fieldsets = (
-        ('Пороговые размеры для малых рам', {
-            'fields': ('max_size_x1', 'max_size_x2'),
-            'description': 'Рама считается малой, если обе стороны не превышают эти значения (в любом порядке)'
-        }),
-        ('Коэффициенты цен', {
-            'fields': ('multiplier_for_large',),
-            'description': 'Коэффициент умножения стоимости работ для рам больше порогового размера'
-        }),
-        ('Системная информация', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    def has_add_permission(self, request):
-        """Запретить создание новых записей (только одна запись настроек)"""
-        return not WorkPriceSettings.objects.exists()
-    
-    def has_delete_permission(self, request, obj=None):
-        """Запретить удаление настроек"""
-        return False
+@admin.register(TechOperation)
+class TechOperationAdmin(admin.ModelAdmin):
+    list_display = ['operation_type', 'name', 'size_from', 'size_to', 'rate', 'code']
+    list_filter = ['operation_type']
+    list_editable = ['rate']
+    search_fields = ['name', 'code']
+    ordering = ['operation_type', 'size_from']
+    readonly_fields = ['created_at']

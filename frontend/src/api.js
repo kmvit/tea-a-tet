@@ -50,7 +50,7 @@ export const getTrosiki = () => api.get('/trosiki/');
 export const getPodveski = () => api.get('/podveski/');
 export const getPassepartout = () => api.get('/passepartout/');
 export const getStretches = () => api.get('/stretches/');
-export const getWorks = () => api.get('/works/');
+export const getFoamboards = () => api.get('/foamboards/');
 
 // Расчет цены
 export const calculatePrice = (data) => api.post('/calculate-price/', data);

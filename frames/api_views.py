@@ -7,9 +7,9 @@ from django.http import HttpResponse
 
 from .models import (
     Baguette, Glass, Backing, Hardware, Podramnik, Package,
-    Molding, Trosik, Podveski, Passepartout, Stretch, Work
+    Molding, Trosik, Podveski, Passepartout, Stretch, Foamboard, TechOperation
 )
-from .services import PriceCalculator, StockDeduction
+from .services import PriceCalculator, StockDeduction, OrderExtrasCalculator
 from orders.models import Order
 
 
@@ -216,16 +216,31 @@ def get_stretches(request):
 
 
 @api_view(['GET'])
-def get_works(request):
-    """API для получения списка работ"""
-    works = Work.objects.all()
+def get_foamboards(request):
+    """API для получения списка пенокартона (накатка)"""
     data = []
-    for work in works:
+    for fb in Foamboard.objects.all():
         data.append({
-            'id': work.pk,
-            'name': work.name,
-            'price': float(work.price),
-            'material_type': work.material_type,
+            'id': fb.pk,
+            'name': fb.name,
+            'price': float(fb.price),
+        })
+    return Response(data)
+
+
+@api_view(['GET'])
+def get_works(request):
+    """API для получения справочника технологических операций (работ)"""
+    data = []
+    for op in TechOperation.objects.all():
+        data.append({
+            'id': op.pk,
+            'code': op.code,
+            'operation_type': op.operation_type,
+            'name': op.name,
+            'size_from': float(op.size_from) if op.size_from is not None else None,
+            'size_to': float(op.size_to) if op.size_to is not None else None,
+            'rate': float(op.rate) if op.rate is not None else None,
         })
     return Response(data)
 
@@ -405,6 +420,10 @@ def calculate_price_api(request):
                     result['total_price'] += Decimal(str(value.get('total_price', 0)))
             
             result['total_price'] = float(result['total_price'])
+            extras = OrderExtrasCalculator.compute(
+                frames=frames, passepartouts=passepartouts, x1=eff_x1, x2=eff_x2, data=data
+            )
+            OrderExtrasCalculator.apply(result, extras)
             return Response(result)
         else:
             # Обратная совместимость: расчет для одной рамы
@@ -449,9 +468,14 @@ def calculate_price_api(request):
                         'total_price': float(pp_price),
                     }
                     calculation['total_price'] += float(pp_price)
-            
+
+            single_frames = [{'baguette_id': data.get('baguette_id'), 'x1': x1, 'x2': x2}] if data.get('baguette_id') else []
+            extras = OrderExtrasCalculator.compute(
+                frames=single_frames, passepartouts=passepartouts, x1=x1, x2=x2, data=data
+            )
+            OrderExtrasCalculator.apply(calculation, extras)
             return Response(calculation)
-    
+
     except Exception as e:
         return Response({'error': str(e)}, status=400)
 
@@ -528,11 +552,7 @@ def create_order_api(request):
         # Упаковка опциональна
         if data.get('package_id'):
             order_data['package_id'] = data.get('package_id')
-        
-        # Работа опциональна
-        if data.get('work_id'):
-            order_data['work_id'] = data.get('work_id')
-        
+
         # Опциональные компоненты
         if data.get('molding_id'):
             order_data['molding_id'] = data.get('molding_id')
@@ -661,6 +681,13 @@ def create_order_api(request):
                 work_id=order_data.get('work_id'),
             )
         
+        # Автосложность (в цену) + работы (справочно)
+        extras = OrderExtrasCalculator.compute(
+            frames=frames, passepartouts=passepartouts,
+            x1=order_data['x1'], x2=order_data['x2'], data=data
+        )
+        OrderExtrasCalculator.apply(calculation, extras)
+
         order_data['total_price'] = Decimal(str(calculation['total_price']))
         order_data['status'] = 'new'
         
@@ -823,15 +850,6 @@ def get_order_detail(request, order_id):
                         except Passepartout.DoesNotExist:
                             pass
                     
-                    # Восстанавливаем работу
-                    if frame_data.get('work_id'):
-                        frame['work_id'] = frame_data['work_id']
-                        try:
-                            work = Work.objects.get(pk=frame_data['work_id'])
-                            frame['work'] = {'id': work.id, 'name': work.name, 'price': float(work.price)}
-                        except Work.DoesNotExist:
-                            pass
-                    
                     if frame:
                         frames.append(frame)
             except (json.JSONDecodeError, KeyError) as e:
@@ -857,9 +875,6 @@ def get_order_detail(request, order_id):
                     'width': float(order.passepartout_width) if order.passepartout_width else None,
                 } if order.passepartout else None,
             }
-            if order.work:
-                frame_from_order['work_id'] = order.work.id
-                frame_from_order['work'] = {'id': order.work.id, 'name': order.work.name, 'price': float(order.work.price)}
             frames.append(frame_from_order)
 
         restored_passepartouts = []
@@ -976,9 +991,36 @@ def get_order_detail(request, order_id):
                 passepartout_id=order.passepartout.id if order.passepartout else None,
                 passepartout_length=order.passepartout_length,
                 passepartout_width=order.passepartout_width,
-                work_id=order.work.id if order.work else None,
             )
-        
+
+        # Автосложность (в цену) + работы (справочно) — пересчёт для детализации
+        extras_frames = []
+        for fr in frames:
+            bid = (fr.get('baguette') or {}).get('id')
+            if bid:
+                extras_frames.append({'baguette_id': bid, 'x1': order.x1, 'x2': order.x2})
+        extras_pps = [{'passepartout_id': p['id']} for p in restored_passepartouts]
+        for fr in frames:
+            pp = fr.get('passepartout')
+            if pp and pp.get('id'):
+                extras_pps.append({'passepartout_id': pp['id']})
+        extras_data = {
+            'baguette_id': order.baguette_id,
+            'glass_id': order.glass_id,
+            'backing_id': order.backing_id,
+            'hardware_id': order.hardware_id,
+            'hardware_quantity': order.hardware_quantity,
+            'podramnik_id': order.podramnik_id,
+            'molding_id': order.molding_id,
+            'package_id': order.package_id,
+            'quantity': 1,
+        }
+        extras = OrderExtrasCalculator.compute(
+            frames=extras_frames, passepartouts=extras_pps,
+            x1=order.x1, x2=order.x2, data=extras_data,
+        )
+        OrderExtrasCalculator.apply(calculation, extras)
+
         order_data = {
             'id': order.pk,
             'x1': float(order.x1),
@@ -1029,11 +1071,6 @@ def get_order_detail(request, order_id):
                 'price_per_unit': float(order.podveski.price_per_unit),
                 'quantity': order.podveski_quantity,
             } if order.podveski else None,
-            'work': {
-                'id': order.work.id,
-                'name': order.work.name,
-                'price': float(order.work.price),
-            } if order.work else None,
             'total_price': float(order.total_price),
             'status': order.status,
             'status_display': order.get_status_display(),

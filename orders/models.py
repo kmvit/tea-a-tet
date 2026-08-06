@@ -1,7 +1,7 @@
 from django.db import models
 from frames.models import (
     Baguette, Glass, Backing, Hardware, Podramnik, Package,
-    Molding, Trosik, Podveski, Material, Passepartout, Work
+    Molding, Trosik, Podveski, Material, Passepartout
 )
 import json
 
@@ -56,14 +56,18 @@ class Order(models.Model):
         Glass,
         on_delete=models.PROTECT,
         verbose_name='Стекло',
-        related_name='orders'
+        related_name='orders',
+        blank=True,
+        null=True
     )
-    
+
     backing = models.ForeignKey(
         Backing,
         on_delete=models.PROTECT,
         verbose_name='Подкладка',
-        related_name='orders'
+        related_name='orders',
+        blank=True,
+        null=True
     )
     
     hardware = models.ForeignKey(
@@ -89,15 +93,6 @@ class Order(models.Model):
         Package,
         on_delete=models.PROTECT,
         verbose_name='Упаковка',
-        related_name='orders',
-        blank=True,
-        null=True
-    )
-    
-    work = models.ForeignKey(
-        Work,
-        on_delete=models.PROTECT,
-        verbose_name='Работа',
         related_name='orders',
         blank=True,
         null=True

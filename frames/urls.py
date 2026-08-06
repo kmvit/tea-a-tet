@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/podveski/', api_views.get_podveski, name='api_podveski'),
     path('api/passepartout/', api_views.get_passepartout, name='api_passepartout'),
     path('api/stretches/', api_views.get_stretches, name='api_stretches'),
+    path('api/foamboards/', api_views.get_foamboards, name='api_foamboards'),
     path('api/works/', api_views.get_works, name='api_works'),
     path('api/calculate-price/', api_views.calculate_price_api, name='api_calculate_price'),
     path('api/create-order/', api_views.create_order_api, name='api_create_order'),

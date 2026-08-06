@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useOrder } from '../context/OrderContext';
 import { FramePreview } from './FramePreview';
+import { WorksPanel } from './WorksPanel';
 
 export const PricePanel = () => {
   const { orderData, priceCalculation, calculateCurrentPrice, paintingImage, setPaintingImage } = useOrder();
@@ -73,6 +74,11 @@ export const PricePanel = () => {
           </div>
         )}
       </div>
+
+      {/* Работы (справочно) */}
+      {priceCalculation?.works && (
+        <WorksPanel works={priceCalculation.works} className="mb-6" />
+      )}
 
       {/* Итого */}
       <div className="border-t-2 border-gray-200 pt-4">
