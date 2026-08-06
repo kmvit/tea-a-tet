@@ -396,10 +396,7 @@ export const Wizard = () => {
       }
     }
 
-    const hasBaguette = frames.some(frame => frame.baguette_id);
-    if (!hasBaguette) {
-      newErrors.frames = 'Выберите багет хотя бы в одной раме';
-    }
+    // Багет необязателен: рама изготавливается и без выбора багета из каталога.
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -634,9 +631,8 @@ export const Wizard = () => {
   // Проверка завершенности шага (та же логика, что в ProgressBar)
   const isStepCompleted = (stepNumber) => {
     if (stepNumber === 1) {
-      const hasFrames = orderData.frames && orderData.frames.length > 0;
-      const hasBaguette = hasFrames && orderData.frames.some(f => f.baguette_id);
-      return orderData.x1 && orderData.x2 && hasBaguette;
+      // Шаг 1 завершён, если заданы размеры (багет опционален)
+      return Boolean(orderData.x1 && orderData.x2);
     }
     if (stepNumber === 2) return true; // Стекло, подкладка и подрамник опциональны
     if (stepNumber === 3) return true; // Дополнительные опции опциональны
