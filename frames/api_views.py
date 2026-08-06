@@ -684,7 +684,11 @@ def create_order_api(request):
                 work_id=order_data.get('work_id'),
             )
         
-        # Автосложность (в цену) + работы (справочно)
+        # Ручная сложность (доп. сумма) — сохраняем на заказе
+        if data.get('manual_complexity'):
+            order_data['manual_complexity'] = Decimal(str(data.get('manual_complexity')))
+
+        # Работы (в цену) + ручная сложность
         extras = OrderExtrasCalculator.compute(
             frames=frames, passepartouts=passepartouts,
             x1=order_data['x1'], x2=order_data['x2'], data=data
@@ -1016,6 +1020,7 @@ def get_order_detail(request, order_id):
             'podramnik_id': order.podramnik_id,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
+            'manual_complexity': order.manual_complexity,
             'quantity': 1,
         }
         extras = OrderExtrasCalculator.compute(
@@ -1086,8 +1091,9 @@ def get_order_detail(request, order_id):
             'payment_method': order.payment_method,
             'advance_payment': float(order.advance_payment) if order.advance_payment else 0,
             'debt': float(order.debt) if order.debt else 0,
+            'manual_complexity': float(order.manual_complexity) if order.manual_complexity else 0,
         }
-        
+
         return Response(order_data)
     
     except Order.DoesNotExist:

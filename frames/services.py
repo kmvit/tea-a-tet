@@ -495,6 +495,7 @@ class OrderExtrasCalculator:
         total_rate = sum(w['total'] for w in works)
 
         return {
+            'manual_complexity': float(_dec(data.get('manual_complexity'))),
             'complexity': {
                 'frame': float(compR * q),
                 'passepartout': float(compP * q),
@@ -551,6 +552,7 @@ class OrderExtrasCalculator:
             'podramnik_id': order.podramnik_id,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
+            'manual_complexity': order.manual_complexity,
             'quantity': 1,
         }
         return cls.compute(frames=extras_frames, passepartouts=pps, x1=order.x1, x2=order.x2, data=data)
@@ -564,7 +566,13 @@ class OrderExtrasCalculator:
         в цену не добавляется (иначе было бы задвоение).
         """
         works = extras['works']
-        calculation['total_price'] = float(calculation.get('total_price', 0)) + works['total_rate']
+        manual = extras.get('manual_complexity') or 0
+        total = float(calculation.get('total_price', 0)) + works['total_rate'] + manual
+        if manual > 0:
+            calculation.setdefault('components', {})['manual_complexity'] = {
+                'name': 'Сложность', 'total_price': manual
+            }
+        calculation['total_price'] = total
         calculation['works'] = works
         return calculation
 

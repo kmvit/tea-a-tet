@@ -156,6 +156,12 @@ class Order(models.Model):
     payment_method = models.CharField('Способ оплаты', max_length=50, blank=True, null=True, default='наличные')
     comment = models.TextField('Комментарий к заказу', blank=True, null=True)
     
+    # Ручная сложность (доп. сумма, вводится вручную и добавляется к цене)
+    manual_complexity = models.DecimalField(
+        'Сложность (вручную, руб)', max_digits=12, decimal_places=2, default=0,
+        help_text='Дополнительная сумма за сложность, вводится вручную. Добавляется к цене полностью.'
+    )
+
     # Итоговая информация
     total_price = models.DecimalField('Итоговая цена (руб)', max_digits=12, decimal_places=2)
     advance_payment = models.DecimalField('Аванс (руб)', max_digits=12, decimal_places=2, default=0)
@@ -175,6 +181,8 @@ class Order(models.Model):
     
     def get_baguette_quantity(self):
         """Расчет количества багета: (X1 + X2) * 2 + 8 * W"""
+        if not self.baguette:
+            return (self.x1 + self.x2) * 2
         return (self.x1 + self.x2) * 2 + 8 * self.baguette.width
     
     def get_glass_area(self):

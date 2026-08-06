@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
 import { createOrder } from '../api';
@@ -7,10 +7,16 @@ import { WorksPanel } from '../components/WorksPanel';
 
 export const Summary = () => {
   const navigate = useNavigate();
-  const { orderData, priceCalculation, updateOrderData, resetOrder } = useOrder();
+  const { orderData, priceCalculation, updateOrderData, resetOrder, calculateCurrentPrice } = useOrder();
   const [loading, setLoading] = useState(false);
   const [orderCreated, setOrderCreated] = useState(false);
   const [orderId, setOrderId] = useState(null);
+
+  // Пересчёт при изменении ручной сложности
+  useEffect(() => {
+    calculateCurrentPrice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderData.manual_complexity]);
 
   const handleCreateOrder = async () => {
     setLoading(true);
@@ -35,6 +41,7 @@ export const Summary = () => {
         payment_method: orderData.payment_method || 'наличные',
         advance_payment: orderData.advance_payment,
         comment: orderData.comment || null,
+        manual_complexity: orderData.manual_complexity || 0,
       };
 
       if (orderData.frames && orderData.frames.length > 0) {
@@ -158,6 +165,25 @@ export const Summary = () => {
               {priceCalculation?.works && (
                 <WorksPanel works={priceCalculation.works} />
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Сложность (доп. сумма, ₽)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={orderData.manual_complexity ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    updateOrderData({ manual_complexity: v === '' ? null : parseFloat(v) });
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">Добавляется к итоговой стоимости полностью</p>
+              </div>
 
               <div className="border-t-2 border-gray-300 pt-4">
                 <div className="flex justify-between items-center">

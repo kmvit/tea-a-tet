@@ -508,6 +508,16 @@ def generate_receipt_word(order_id):
                 for run in para.runs:
                     run.font.size = Pt(8)
 
+    # Ручная сложность
+    if extras.get('manual_complexity', 0) > 0:
+        row = details_table.add_row()
+        row.cells[2].text = "СЛОЖНОСТЬ:"
+        row.cells[6].text = f"{format_number(extras['manual_complexity'])} руб"
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(8)
+
     add_table_border(details_table)
     
     # Уменьшаем отступы в таблице
@@ -794,6 +804,8 @@ def generate_receipt_html(order_id):
     extras = OrderExtrasCalculator.for_order(order, frames)
     for work in extras['works']['items']:
         detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': work['name'], 'col6': format_number(work['total'])})
+    if extras.get('manual_complexity', 0) > 0:
+        detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ:', 'col6': format_number(extras['manual_complexity'])})
 
     customer_parts = []
     if order.customer_name:

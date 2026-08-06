@@ -50,6 +50,7 @@ export const OrderProvider = ({ children }) => {
     payment_method: 'наличные',
     advance_payment: null,
     comment: null,
+    manual_complexity: null,
   });
 
   const [priceCalculation, setPriceCalculation] = useState(null);
@@ -87,6 +88,7 @@ export const OrderProvider = ({ children }) => {
         podveski_id: orderData.podveski_id,
         podveski_quantity: orderData.podveski_quantity,
         stretch_id: orderData.stretch_id,
+        manual_complexity: orderData.manual_complexity,
       };
       
       // Если есть массив рамок, отправляем его (с валидными размерами в каждой раме)
@@ -150,6 +152,7 @@ export const OrderProvider = ({ children }) => {
       payment_method: 'наличные',
       advance_payment: null,
       comment: null,
+      manual_complexity: null,
     });
     setPriceCalculation(null);
     setPaintingImage(null);

@@ -43,7 +43,7 @@ class OrderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Итоговая информация', {
-            'fields': ('total_price', 'status')
+            'fields': ('manual_complexity', 'total_price', 'status')
         }),
         ('Расчеты', {
             'fields': ('get_baguette_quantity', 'get_glass_area'),
