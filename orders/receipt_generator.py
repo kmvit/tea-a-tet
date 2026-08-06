@@ -421,10 +421,30 @@ def generate_receipt_word(order_id):
                 for para in cell.paragraphs:
                     for run in para.runs:
                         run.font.size = Pt(8)
-    
-    # Если нет рамок, это ошибка
+        else:
+            # Рама без выбранного багета — показываем по размерам (багет опционален)
+            frame_data_local = frames[frame_idx] if frames and frame_idx < len(frames) else {}
+            rx1 = Decimal(str(frame_data_local.get('x1', order.x1))) if frame_data_local.get('x1') else order.x1
+            rx2 = Decimal(str(frame_data_local.get('x2', order.x2))) if frame_data_local.get('x2') else order.x2
+            if not rx1 or not rx2 or rx1 <= 0 or rx2 <= 0:
+                rx1, rx2 = order.x1, order.x2
+            if rx1 and rx2 and rx1 > 0 and rx2 > 0:
+                has_frames = True
+                row = details_table.add_row()
+                row.cells[0].text = "1"
+                row.cells[1].text = "0.6"
+                row.cells[2].text = f"Рама {frame_idx + 1}"
+                row.cells[3].text = f"{format_number(rx1)}×{format_number(rx2)} см"
+                for i in (4, 5, 6):
+                    row.cells[i].text = ""
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        for run in para.runs:
+                            run.font.size = Pt(8)
+
+    # Пустой заказ (нет ни рамы, ни размеров) — нечего печатать
     if not has_frames:
-        raise ValueError("У заказа должен быть хотя бы один багет")
+        raise ValueError("Заказ пустой: нет ни рамы, ни размеров")
     
     # Добавляем остальные компоненты из расчета
     components_map = {
@@ -774,8 +794,22 @@ def generate_receipt_html(order_id):
                           format_number(baguette.width), format_number(baguette.price), format_number(baguette_price)],
                 'desc': {'col2': f'Багет: {baguette.name}', 'col3': f'расход {format_number(baguette_quantity)} м'}
             })
+        else:
+            # Рама без выбранного багета — показываем по размерам (багет опционален)
+            frame_data_local = frames[frame_idx] if frames and frame_idx < len(frames) else {}
+            rx1 = Decimal(str(frame_data_local.get('x1', order.x1))) if frame_data_local.get('x1') else order.x1
+            rx2 = Decimal(str(frame_data_local.get('x2', order.x2))) if frame_data_local.get('x2') else order.x2
+            if not rx1 or not rx2 or rx1 <= 0 or rx2 <= 0:
+                rx1, rx2 = order.x1, order.x2
+            if rx1 and rx2 and rx1 > 0 and rx2 > 0:
+                has_frames = True
+                detail_rows.append({
+                    'cells': ['1', '0.6', f'Рама {frame_idx + 1}', f'{format_number(rx1)}×{format_number(rx2)} см',
+                              '', '', ''],
+                    'desc': None
+                })
     if not has_frames:
-        raise ValueError("У заказа должен быть хотя бы один багет")
+        raise ValueError("Заказ пустой: нет ни рамы, ни размеров")
 
     for component_key, (label, quantity_key, unit) in components_map.items():
         if component_key in calculation.get('components', {}):
@@ -851,7 +885,8 @@ def generate_receipt_html(order_id):
         if 'cells' in r:
             html_rows += f'''<tr><td>{esc(r['cells'][0])}</td><td>{esc(r['cells'][1])}</td><td>{esc(r['cells'][2])}</td>
                 <td>{esc(r['cells'][3])}</td><td>{esc(r['cells'][4])}</td><td>{esc(r['cells'][5])}</td><td>{esc(r['cells'][6])}</td></tr>'''
-            html_rows += f'''<tr><td></td><td></td><td>{esc(r['desc']['col2'])}</td><td>{esc(r['desc']['col3'])}</td><td></td><td></td><td></td></tr>'''
+            if r.get('desc'):
+                html_rows += f'''<tr><td></td><td></td><td>{esc(r['desc']['col2'])}</td><td>{esc(r['desc']['col3'])}</td><td></td><td></td><td></td></tr>'''
         else:
             html_rows += f'''<tr><td></td><td></td><td>{esc(r.get('col2',''))}</td><td>{esc(r.get('col3',''))}</td>
                 <td>{esc(r.get('col4',''))}</td><td></td><td>{esc(r.get('col6',''))} руб</td></tr>'''
