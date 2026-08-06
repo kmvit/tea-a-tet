@@ -331,6 +331,10 @@ class OrderExtrasCalculator:
         fr = [f for f in (frames or []) if f.get('baguette_id')]
         if not fr and data.get('baguette_id'):
             fr = [{'baguette_id': data['baguette_id'], 'x1': gx1, 'x2': gx2}]
+        # Багет опционален: если он не выбран, но заданы размеры — рама всё равно
+        # изготавливается, поэтому считаем одну раму по размерам (ширина багета = 0).
+        if not fr and gx1 > 0 and gx2 > 0:
+            fr = [{'baguette_id': None, 'x1': gx1, 'x2': gx2}]
         infos = []
         for f in fr:
             fx1 = _dec(f.get('x1') or gx1)
