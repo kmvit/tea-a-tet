@@ -49,7 +49,9 @@ class Order(models.Model):
         Baguette,
         on_delete=models.PROTECT,
         verbose_name='Багет',
-        related_name='orders'
+        related_name='orders',
+        blank=True,
+        null=True
     )
     
     glass = models.ForeignKey(
