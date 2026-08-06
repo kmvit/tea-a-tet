@@ -19,6 +19,19 @@ def _okr(value) -> int:
     return int(_dec(value).to_integral_value(rounding=ROUND_HALF_UP))
 
 
+# Минимальная стоимость материала для клиента (пороги из кода 1С, процедура Расчет()):
+# если расчётная стоимость меньше порога — берётся порог.
+MIN_GLASS_PRICE = Decimal('30')
+MIN_BACKING_PRICE = Decimal('20')
+MIN_TROSIK_PRICE = Decimal('50')
+
+
+def _floor(value: Decimal, minimum: Decimal) -> Decimal:
+    """Порог снизу: возвращает minimum, если value <= minimum (как в 1С: >порог ? value : порог)."""
+    value = _dec(value)
+    return value if value > minimum else minimum
+
+
 class PriceCalculator:
     """Класс для расчета стоимости заказа на раму"""
 
@@ -151,24 +164,25 @@ class PriceCalculator:
                 result['total_price'] += baguette_calc['total_price']
                 selected_material_types.append('baguette')
             
-            # Стекло
+            # Стекло (мин. MIN_GLASS_PRICE)
             if glass_id:
                 glass = Glass.objects.get(pk=glass_id)
                 glass_calc = PriceCalculator.calculate_glass_price(x1, x2, glass)
+                glass_total = _floor(glass_calc['total_price'], MIN_GLASS_PRICE)
                 result['components']['glass'] = {
                     'name': glass.name,
                     'area': float(glass_calc['area']),
                     'unit_price': float(glass_calc['unit_price']),
-                    'total_price': float(glass_calc['total_price'])
+                    'total_price': float(glass_total)
                 }
-                result['total_price'] += glass_calc['total_price']
+                result['total_price'] += glass_total
                 selected_material_types.append('glass')
-            
-            # Подкладка
+
+            # Подкладка (мин. MIN_BACKING_PRICE)
             if backing_id:
                 backing = Backing.objects.get(pk=backing_id)
                 backing_area = PriceCalculator.calculate_glass_area(x1, x2)
-                backing_price = backing.price * backing_area
+                backing_price = _floor(backing.price * backing_area, MIN_BACKING_PRICE)
                 result['components']['backing'] = {
                     'name': backing.name,
                     'area': float(backing_area),
@@ -229,11 +243,11 @@ class PriceCalculator:
                 result['total_price'] += molding_price
                 selected_material_types.append('molding')
             
-            # Тросик
+            # Тросик (мин. MIN_TROSIK_PRICE)
             if trosik_id and trosik_length:
                 trosik = Trosik.objects.get(pk=trosik_id)
                 trosik_length_m = PriceCalculator.normalize_length_to_meters(trosik_length)
-                trosik_price = trosik.price_per_meter * trosik_length_m
+                trosik_price = _floor(trosik.price_per_meter * trosik_length_m, MIN_TROSIK_PRICE)
                 result['components']['trosik'] = {
                     'name': trosik.name,
                     'length': float(trosik_length_m),

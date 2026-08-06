@@ -9,7 +9,10 @@ from .models import (
     Baguette, Glass, Backing, Hardware, Podramnik, Package,
     Molding, Trosik, Podveski, Passepartout, Stretch, Foamboard, TechOperation
 )
-from .services import PriceCalculator, StockDeduction, OrderExtrasCalculator
+from .services import (
+    PriceCalculator, StockDeduction, OrderExtrasCalculator,
+    _floor, MIN_GLASS_PRICE, MIN_BACKING_PRICE,
+)
 from orders.models import Order
 
 
@@ -367,7 +370,7 @@ def calculate_price_api(request):
                 glass_calc = {
                     'area': float(total_glass_area),
                     'unit_price': float(glass.price_per_sqm),
-                    'total_price': float(total_glass_area * glass.price_per_sqm)
+                    'total_price': float(_floor(total_glass_area * glass.price_per_sqm, MIN_GLASS_PRICE))
                 }
                 result['components']['glass'] = {
                     'name': glass.name,
@@ -388,7 +391,7 @@ def calculate_price_api(request):
             # Подкладка — по суммарной площади всех рам
             if data.get('backing_id') and total_glass_area > 0:
                 backing = Backing.objects.get(pk=data['backing_id'])
-                backing_price = total_glass_area * backing.price
+                backing_price = _floor(total_glass_area * backing.price, MIN_BACKING_PRICE)
                 result['components']['backing'] = {
                     'name': backing.name,
                     'area': float(total_glass_area),
@@ -637,7 +640,7 @@ def create_order_api(request):
 
             if order_data.get('backing_id') and total_glass_area > 0:
                 backing = Backing.objects.get(pk=order_data['backing_id'])
-                result['total_price'] += total_glass_area * backing.price
+                result['total_price'] += _floor(total_glass_area * backing.price, MIN_BACKING_PRICE)
 
             if order_data.get('podramnik_id') and frame_sizes:
                 podramnik = Podramnik.objects.get(pk=order_data['podramnik_id'])
@@ -649,7 +652,7 @@ def create_order_api(request):
             if order_data.get('glass_id') and total_glass_area > 0:
                 from frames.models import Glass
                 glass = Glass.objects.get(pk=order_data['glass_id'])
-                gp = total_glass_area * glass.price_per_sqm
+                gp = _floor(total_glass_area * glass.price_per_sqm, MIN_GLASS_PRICE)
                 result['total_price'] += gp
             if data.get('stretch_id') and total_glass_area > 0:
                 from frames.models import Stretch
