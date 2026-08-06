@@ -508,6 +508,53 @@ class OrderExtrasCalculator:
             },
         }
 
+    @classmethod
+    def for_order(cls, order, frames: Optional[List[Dict]] = None) -> Dict[str, Any]:
+        """Считает сложность и работы для сохранённого заказа (для квитанции/детализации)."""
+        frames = frames or []
+        extras_frames = []
+        for f in frames:
+            if isinstance(f, dict):
+                extras_frames.append({
+                    'baguette_id': f.get('baguette_id'),
+                    'x1': f.get('x1') or order.x1,
+                    'x2': f.get('x2') or order.x2,
+                })
+        if not extras_frames:
+            extras_frames = [{'baguette_id': order.baguette_id, 'x1': order.x1, 'x2': order.x2}]
+
+        pps = []
+        if frames and isinstance(frames[0], dict):
+            embedded = frames[0].get('passepartouts')
+            if isinstance(embedded, list):
+                pps.extend([p for p in embedded if isinstance(p, dict) and p.get('passepartout_id')])
+        for f in frames:
+            if isinstance(f, dict) and f.get('passepartout_id'):
+                pps.append({
+                    'passepartout_id': f.get('passepartout_id'),
+                    'passepartout_length': f.get('passepartout_length'),
+                    'passepartout_width': f.get('passepartout_width'),
+                })
+        if not pps and order.passepartout_id:
+            pps.append({
+                'passepartout_id': order.passepartout_id,
+                'passepartout_length': order.passepartout_length,
+                'passepartout_width': order.passepartout_width,
+            })
+
+        data = {
+            'baguette_id': order.baguette_id,
+            'glass_id': order.glass_id,
+            'backing_id': order.backing_id,
+            'hardware_id': order.hardware_id,
+            'hardware_quantity': order.hardware_quantity,
+            'podramnik_id': order.podramnik_id,
+            'molding_id': order.molding_id,
+            'package_id': order.package_id,
+            'quantity': 1,
+        }
+        return cls.compute(frames=extras_frames, passepartouts=pps, x1=order.x1, x2=order.x2, data=data)
+
     @staticmethod
     def apply(calculation: Dict, extras: Dict) -> Dict:
         """

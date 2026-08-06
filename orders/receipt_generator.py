@@ -8,7 +8,7 @@ from datetime import datetime
 import json
 from io import BytesIO
 from .models import Order
-from frames.services import PriceCalculator
+from frames.services import PriceCalculator, OrderExtrasCalculator
 
 
 def add_table_border(table):
@@ -496,48 +496,18 @@ def generate_receipt_word(order_id):
                     for run in para.runs:
                         run.font.size = Pt(8)
     
-    # Работы по рамам (work_frame1, work_frame2, ...) - добавляем с ценой в детализацию
-    for key in sorted(calculation.get('components', {}).keys()):
-        if key.startswith('work_frame'):
-            component = calculation['components'][key]
-            row = details_table.add_row()
-            row.cells[2].text = "РАБОТА:"
-            row.cells[3].text = component.get('name', '')
-            row.cells[6].text = f"{format_number(component.get('total_price', 0))} руб"
-            for cell in row.cells:
-                for para in cell.paragraphs:
-                    for run in para.runs:
-                        run.font.size = Pt(8)
-    
-    # Наценка за работу/скидка (10%)
-    # Рассчитываем наценку от базовой стоимости (без наценки)
-    # Если total_price = base_price * 1.1, то base_price = total_price / 1.1
-    markup_percent = 10
-    base_price = float(order.total_price) / (1 + markup_percent / 100)
-    markup_amount = float(order.total_price) - base_price
-    row = details_table.add_row()
-    row.cells[2].text = "наценка за работу/скидка"
-    row.cells[3].text = f"{markup_percent} %"
-    row.cells[6].text = f"{format_number(markup_amount)} руб"
-    
-    # Устанавливаем размер шрифта
-    for cell in row.cells:
-        for para in cell.paragraphs:
-            for run in para.runs:
-                run.font.size = Pt(8)
-    
-    # Сложность рамы
-    complexity_price = 30
-    row = details_table.add_row()
-    row.cells[2].text = "СЛОЖНОСТЬ РАМЫ"
-    row.cells[6].text = f"{format_number(complexity_price)} руб"
-    
-    # Устанавливаем размер шрифта
-    for cell in row.cells:
-        for para in cell.paragraphs:
-            for run in para.runs:
-                run.font.size = Pt(8)
-    
+    # Работы (входят в стоимость) — по данным справочника технологических операций
+    extras = OrderExtrasCalculator.for_order(order, frames)
+    for work in extras['works']['items']:
+        row = details_table.add_row()
+        row.cells[2].text = "РАБОТА:"
+        row.cells[3].text = work['name']
+        row.cells[6].text = f"{format_number(work['total'])} руб"
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(8)
+
     add_table_border(details_table)
     
     # Уменьшаем отступы в таблице
@@ -764,10 +734,6 @@ def generate_receipt_html(order_id):
         'stretch': ('НАТЯЖКА:', 'area', 'кв.м'),
         'work': ('РАБОТА:', None, None),
     }
-    markup_percent = 10
-    base_price = float(order.total_price) / (1 + markup_percent / 100)
-    markup_amount = float(order.total_price) - base_price
-    complexity_price = 30
 
     from frames.models import Baguette
     detail_rows = []
@@ -824,12 +790,10 @@ def generate_receipt_html(order_id):
         if key.startswith('passepartout_frame'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'ПАСПАРТУ:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
-    for key in sorted(calculation.get('components', {}).keys()):
-        if key.startswith('work_frame'):
-            c = calculation['components'][key]
-            detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
-    detail_rows.append({'component': True, 'col2': 'наценка за работу/скидка', 'col3': f'{markup_percent} %', 'col6': format_number(markup_amount)})
-    detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ РАМЫ', 'col6': format_number(complexity_price)})
+    # Работы (входят в стоимость) — по данным справочника технологических операций
+    extras = OrderExtrasCalculator.for_order(order, frames)
+    for work in extras['works']['items']:
+        detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': work['name'], 'col6': format_number(work['total'])})
 
     customer_parts = []
     if order.customer_name:
