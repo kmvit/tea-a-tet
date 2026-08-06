@@ -510,18 +510,15 @@ class OrderExtrasCalculator:
 
     @staticmethod
     def apply(calculation: Dict, extras: Dict) -> Dict:
-        """Добавляет сложность в цену и прикрепляет блок работ (справочно) к расчёту."""
-        comp = extras['complexity']
-        components = calculation.setdefault('components', {})
-        for key, label, val in (
-            ('complexity_frame', 'Сложность рамы', comp['frame']),
-            ('complexity_pp', 'Сложность паспарту', comp['passepartout']),
-            ('complexity_mount', 'Сложность крепления', comp['mount']),
-        ):
-            if val > 0:
-                components[key] = {'name': label, 'total_price': val}
-        calculation['total_price'] = float(calculation.get('total_price', 0)) + comp['total']
-        calculation['works'] = extras['works']
+        """
+        Включает работы в стоимость заказа (все работы оплачивает клиент).
+        Сложность рамы/паспарту/крепления входит в цену как соответствующая
+        работа (сложность / 2), поэтому отдельной строкой полной сложности
+        в цену не добавляется (иначе было бы задвоение).
+        """
+        works = extras['works']
+        calculation['total_price'] = float(calculation.get('total_price', 0)) + works['total_rate']
+        calculation['works'] = works
         return calculation
 
 
