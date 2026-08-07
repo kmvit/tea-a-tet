@@ -59,7 +59,7 @@ OPERATIONS = {
         (27, '60', '99.99', '100'), (78, '100', '149.99', '130'),
     ]),
     'molding': ('Молдинг', [(24, None, None, '42')]),
-    'stretch': ('Натяжка', [(30, None, None, None)]),
+    'stretch': ('Натяжка', [(30, '0', '400', '40')]),
     'complexity_frame': ('Сложность рамы', [(37, None, None, None)]),
     'complexity_pp': ('Сложность паспарту', [(38, None, None, None)]),
     'complexity_mount': ('Сложность крепления', [(46, None, None, None)]),

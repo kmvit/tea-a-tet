@@ -470,13 +470,10 @@ class OrderExtrasCalculator:
         if data.get('molding_id'):
             add_work('molding', 0)  # фиксированная расценка
 
-        # Натяжка: расценка = Окр(цена_натяжки * 45 / 100)
+        # Натяжка: расценка из справочника по размеру (макс. сторона рамы),
+        # как у остальных работ. Площадь/склад считаются отдельно по кв.м.
         if data.get('stretch_id'):
-            stretch = Stretch.objects.filter(pk=data['stretch_id']).first()
-            if stretch:
-                area = PriceCalculator.calculate_glass_area(gx1, gx2)
-                price_nat = area * stretch.price_per_sqm
-                add_work('stretch', 0, label='Натяжка', rate_override=_okr(price_nat * 45 / 100))
+            add_work('stretch', base_max, label='Натяжка')
 
         # Упаковка: расценка = Окр(цена_упаковки / 2)
         if data.get('package_id'):
