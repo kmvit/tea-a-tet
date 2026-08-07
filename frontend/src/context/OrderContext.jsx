@@ -53,9 +53,9 @@ export const OrderProvider = ({ children }) => {
 
   const calculateCurrentPrice = useCallback(async () => {
     try {
-      // Определяем валидные x1, x2 (глобальные или из первой рамы)
-      const x1 = orderData.x1 ?? orderData.frames?.[0]?.x1;
-      const x2 = orderData.x2 ?? orderData.frames?.[0]?.x2;
+      // Размер картины: если рама добавлена — берём из Рамы 1, иначе глобальный
+      const x1 = orderData.frames?.[0]?.x1 ?? orderData.x1;
+      const x2 = orderData.frames?.[0]?.x2 ?? orderData.x2;
       const x1Val = parseFloat(x1);
       const x2Val = parseFloat(x2);
       if (!x1 || !x2 || isNaN(x1Val) || isNaN(x2Val) || x1Val <= 0 || x2Val <= 0) {

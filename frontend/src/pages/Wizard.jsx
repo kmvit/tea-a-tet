@@ -109,7 +109,7 @@ export const Wizard = () => {
   };
   // Размер картины = внутренний размер первой рамы
   const getPictureSize = (framesArr) => {
-    if (framesArr.length > 1) {
+    if (framesArr.length >= 1) {
       return { x1: parseFloat(framesArr[0]?.x1), x2: parseFloat(framesArr[0]?.x2) };
     }
     return { x1: parseFloat(x1), x2: parseFloat(x2) };
@@ -367,7 +367,8 @@ export const Wizard = () => {
     e.preventDefault();
     const newErrors = {};
 
-    if (frames.length <= 1) {
+    if (frames.length === 0) {
+      // Рам нет — проверяем размер картины
       if (!x1 || parseFloat(x1) <= 0) {
         newErrors.x1 = 'Введите корректный размер X1';
       }
@@ -375,14 +376,13 @@ export const Wizard = () => {
         newErrors.x2 = 'Введите корректный размер X2';
       }
     } else {
+      // У каждой рамы должны быть заданы свои размеры
       for (let i = 0; i < frames.length; i++) {
         const f = frames[i];
-        if (f.baguette_id) {
-          const vx1 = parseFloat(f.x1);
-          const vx2 = parseFloat(f.x2);
-          if (!f.x1 || !vx1 || vx1 <= 0) newErrors[`frame_${i}_x1`] = `Рама ${i + 1}: введите размер X1`;
-          if (!f.x2 || !vx2 || vx2 <= 0) newErrors[`frame_${i}_x2`] = `Рама ${i + 1}: введите размер X2`;
-        }
+        const vx1 = parseFloat(f.x1);
+        const vx2 = parseFloat(f.x2);
+        if (!f.x1 || !vx1 || vx1 <= 0) newErrors[`frame_${i}_x1`] = `Рама ${i + 1}: введите размер X1`;
+        if (!f.x2 || !vx2 || vx2 <= 0) newErrors[`frame_${i}_x2`] = `Рама ${i + 1}: введите размер X2`;
       }
     }
 
@@ -395,9 +395,7 @@ export const Wizard = () => {
 
     const finalFrames = frames.length === 0
       ? []
-      : frames.length === 1
-        ? [{ ...frames[0], x1: parseFloat(x1), x2: parseFloat(x2) }]
-        : frames.map((f) => ({ ...f, x1: parseFloat(f.x1), x2: parseFloat(f.x2) }));
+      : frames.map((f) => ({ ...f, x1: parseFloat(f.x1), x2: parseFloat(f.x2) }));
 
     const step1Updates = {
       x1: finalFrames[0]?.x1 ?? parseFloat(x1),
@@ -419,9 +417,11 @@ export const Wizard = () => {
   // Добавление новой рамы
   const addFrame = () => {
     if (frames.length < 3) {
+      // Первая рама берёт размер по умолчанию из размера картины
+      const isFirst = frames.length === 0;
       const newFrame = {
-        x1: null,
-        x2: null,
+        x1: isFirst && x1 ? parseFloat(x1) : null,
+        x2: isFirst && x2 ? parseFloat(x2) : null,
         baguette_id: null,
         baguette_image: null,
         baguette_width: null,
@@ -429,11 +429,6 @@ export const Wizard = () => {
         work_id: null,
       };
       const base = [...frames];
-      // При переходе с одной рамы на несколько переносим размер картины в Раму 1
-      if (base.length === 1) {
-        if (base[0].x1 == null && x1) base[0] = { ...base[0], x1: parseFloat(x1) };
-        if (base[0].x2 == null && x2) base[0] = { ...base[0], x2: parseFloat(x2) };
-      }
       const newFrames = [...base, newFrame];
       setFrames(newFrames);
       setBaguetteSearches([...baguetteSearches, '']);
@@ -676,8 +671,8 @@ export const Wizard = () => {
                   </h2>
                   <form onSubmit={handleStep1Submit} className="space-y-6">
                     <div className="space-y-6">
-                      {/* Размер картины — всегда (для 0 или 1 рамы; при нескольких у каждой свой) */}
-                      {frames.length <= 1 && (
+                      {/* Размер картины — пока рама не добавлена (после добавления размер задаётся в Раме 1) */}
+                      {frames.length === 0 && (
                         <div className="wizard-section p-6">
                           <h3 className="text-xl font-semibold text-gray-800 mb-4">
                             Размер картины
@@ -755,8 +750,8 @@ export const Wizard = () => {
                             </button>
                           </div>
 
-                          {/* Размеры рамы — при нескольких рамах у каждой свои размеры */}
-                          {frames.length > 1 && (
+                          {/* Размеры рамы — у каждой рамы свои (у Рамы 1 = размер картины) */}
+                          {(
                             <div className="mb-6">
                               {frameIndex > 0 && (
                                 <p className="mb-2 text-xs text-gray-500">
