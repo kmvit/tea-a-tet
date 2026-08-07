@@ -49,17 +49,7 @@ export const Wizard = () => {
           x1: f.x1 ?? orderData.x1,
           x2: f.x2 ?? orderData.x2,
         }))
-      : [
-          {
-            x1: orderData.x1 ?? null,
-            x2: orderData.x2 ?? null,
-            baguette_id: null,
-            baguette_image: null,
-            baguette_width: null,
-            baguette_name: null,
-            work_id: null,
-          }
-        ]
+      : []
   );
   const [passepartoutsData, setPassepartoutsData] = useState(orderData.passepartouts || []);
   // Поиск багетов для каждой рамы
@@ -377,7 +367,7 @@ export const Wizard = () => {
     e.preventDefault();
     const newErrors = {};
 
-    if (frames.length === 1) {
+    if (frames.length <= 1) {
       if (!x1 || parseFloat(x1) <= 0) {
         newErrors.x1 = 'Введите корректный размер X1';
       }
@@ -403,9 +393,11 @@ export const Wizard = () => {
       return;
     }
 
-    const finalFrames = frames.length === 1
-      ? [{ ...frames[0], x1: parseFloat(x1), x2: parseFloat(x2) }]
-      : frames.map((f) => ({ ...f, x1: parseFloat(f.x1), x2: parseFloat(f.x2) }));
+    const finalFrames = frames.length === 0
+      ? []
+      : frames.length === 1
+        ? [{ ...frames[0], x1: parseFloat(x1), x2: parseFloat(x2) }]
+        : frames.map((f) => ({ ...f, x1: parseFloat(f.x1), x2: parseFloat(f.x2) }));
 
     const step1Updates = {
       x1: finalFrames[0]?.x1 ?? parseFloat(x1),
@@ -450,17 +442,13 @@ export const Wizard = () => {
     }
   };
 
-  // Удаление рамы
+  // Удаление рамы (можно убрать все — тогда заказ без рамы)
   const removeFrame = (index) => {
-    if (frames.length > 1) {
-      const newFrames = frames.filter((_, i) => i !== index);
-      setFrames(newFrames);
-      const newSearches = baguetteSearches.filter((_, i) => i !== index);
-      setBaguetteSearches(newSearches);
-      setFrameSizeManual(frameSizeManual.filter((_, i) => i !== index));
-      // Обновляем orderData
-      updateOrderData({ frames: newFrames });
-    }
+    const newFrames = frames.filter((_, i) => i !== index);
+    setFrames(newFrames);
+    setBaguetteSearches(baguetteSearches.filter((_, i) => i !== index));
+    setFrameSizeManual(frameSizeManual.filter((_, i) => i !== index));
+    updateOrderData({ frames: newFrames });
   };
 
   // Пометить размер рамы как введённый вручную (или снять пометку при очистке поля)
@@ -688,11 +676,11 @@ export const Wizard = () => {
                   </h2>
                   <form onSubmit={handleStep1Submit} className="space-y-6">
                     <div className="space-y-6">
-                      {/* Размеры — только для одной рамы */}
-                      {frames.length === 1 && (
+                      {/* Размер картины — всегда (для 0 или 1 рамы; при нескольких у каждой свой) */}
+                      {frames.length <= 1 && (
                         <div className="wizard-section p-6">
                           <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                            Размеры картины
+                            Размер картины
                           </h3>
                           <div className="space-y-4">
                             <div>
@@ -758,15 +746,13 @@ export const Wizard = () => {
                             <h3 className="text-xl font-semibold text-gray-800">
                               Рама {frameIndex + 1}
                             </h3>
-                            {frames.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeFrame(frameIndex)}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium"
-                              >
-                                Удалить раму
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeFrame(frameIndex)}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            >
+                              Удалить раму
+                            </button>
                           </div>
 
                           {/* Размеры рамы — при нескольких рамах у каждой свои размеры */}

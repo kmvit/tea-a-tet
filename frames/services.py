@@ -328,24 +328,30 @@ class OrderExtrasCalculator:
 
     @staticmethod
     def _frame_infos(frames: List[Dict], gx1: Decimal, gx2: Decimal, data: Dict) -> List[Dict]:
-        fr = [f for f in (frames or []) if f.get('baguette_id')]
-        if not fr and data.get('baguette_id'):
-            fr = [{'baguette_id': data['baguette_id'], 'x1': gx1, 'x2': gx2}]
-        # Багет опционален: если он не выбран, но заданы размеры — багетная рама
-        # всё равно изготавливается, поэтому считаем одну раму по размерам.
-        # НО не когда заказ — это только подрамник или только натяжка
-        # (там багетной рамы нет, работа «Изготовление рамы» не нужна).
-        if not fr and gx1 > 0 and gx2 > 0 and not data.get('podramnik_id') and not data.get('stretch_id'):
-            fr = [{'baguette_id': None, 'x1': gx1, 'x2': gx2}]
-        infos = []
-        for f in fr:
+        """
+        Рамы задаются явно (мастер добавляет их кнопкой «Добавить раму»).
+        Каждая добавленная рама — это багетная рама (багет опционален), поэтому
+        работа «Изготовление рамы» считается по её размеру. Никакого угадывания
+        по размерам картины: нет добавленных рам — нет и работы по раме.
+        """
+        raw = []
+        for f in (frames or []):
+            if not isinstance(f, dict):
+                continue
             fx1 = _dec(f.get('x1') or gx1)
             fx2 = _dec(f.get('x2') or gx2)
             if fx1 <= 0 or fx2 <= 0:
-                fx1, fx2 = gx1, gx2
-            baguette = Baguette.objects.filter(pk=f['baguette_id']).first()
+                continue
+            raw.append({'baguette_id': f.get('baguette_id'), 'x1': fx1, 'x2': fx2})
+        # Легаси: одиночный заказ без массива frames, но с багетом в data
+        if not raw and data.get('baguette_id') and gx1 > 0 and gx2 > 0:
+            raw.append({'baguette_id': data['baguette_id'], 'x1': gx1, 'x2': gx2})
+
+        infos = []
+        for f in raw:
+            baguette = Baguette.objects.filter(pk=f['baguette_id']).first() if f['baguette_id'] else None
             width = baguette.width if baguette else Decimal('0')
-            infos.append({'x1': fx1, 'x2': fx2, 'width': width, 'max': max(fx1, fx2)})
+            infos.append({'x1': f['x1'], 'x2': f['x2'], 'width': width, 'max': max(f['x1'], f['x2'])})
         return infos
 
     @classmethod
@@ -483,13 +489,8 @@ class OrderExtrasCalculator:
             if package:
                 add_work('package', 0, label='Упаковка', rate_override=_okr(package.price / 2))
 
-        # Сложности как работы = сложность / 2
-        if compR > 0:
-            add_work('complexity_frame', 0, label='Сложность рамы', rate_override=_okr(compR / 2))
-        if compP > 0:
-            add_work('complexity_pp', 0, label='Сложность паспарту', rate_override=_okr(compP / 2))
-        if compMount > 0:
-            add_work('complexity_mount', 0, label='Сложность крепления', rate_override=_okr(compMount / 2))
+        # Авто-сложность отключена: сложность задаётся вручную полем manual_complexity
+        # на заказе. (Расчёт compR/compP/compMount выше сохранён на случай возврата.)
 
         total_rate = sum(w['total'] for w in works)
 
@@ -520,7 +521,8 @@ class OrderExtrasCalculator:
                     'x1': f.get('x1') or order.x1,
                     'x2': f.get('x2') or order.x2,
                 })
-        if not extras_frames:
+        # Легаси: одиночный заказ без массива рам, но с багетом
+        if not extras_frames and order.baguette_id:
             extras_frames = [{'baguette_id': order.baguette_id, 'x1': order.x1, 'x2': order.x2}]
 
         pps = []

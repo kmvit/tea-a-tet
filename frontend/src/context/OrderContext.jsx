@@ -16,17 +16,8 @@ export const OrderProvider = ({ children }) => {
     // Шаг 1: Размеры
     x1: null,
     x2: null,
-    // Рамы (до 3 штук)
-    frames: [
-      {
-        x1: null,
-        x2: null,
-        baguette_id: null,
-        baguette_image: null,
-        baguette_width: null,
-        work_id: null,
-      }
-    ],
+    // Рамы (до 3 штук) — добавляются явно кнопкой «Добавить раму»
+    frames: [],
     passepartouts: [],
     // Шаг 2: Стекло, подкладка и натяжка
     glass_id: null,
@@ -123,16 +114,7 @@ export const OrderProvider = ({ children }) => {
     setOrderData({
       x1: null,
       x2: null,
-      frames: [
-        {
-          x1: null,
-          x2: null,
-          baguette_id: null,
-          baguette_image: null,
-          baguette_width: null,
-          work_id: null,
-        }
-      ],
+      frames: [],
       passepartouts: [],
       glass_id: null,
       backing_id: null,

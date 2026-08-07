@@ -1006,12 +1006,22 @@ def get_order_detail(request, order_id):
                 stretch_id=order.stretch.id if order.stretch else None,
             )
 
-        # Автосложность (в цену) + работы (справочно) — пересчёт для детализации
+        # Работы + сложность — пересчёт для детализации.
+        # Рамы берём из сырого frames_data (включая рамы без багета).
         extras_frames = []
-        for fr in frames:
-            bid = (fr.get('baguette') or {}).get('id')
-            if bid:
-                extras_frames.append({'baguette_id': bid, 'x1': order.x1, 'x2': order.x2})
+        if order.frames_data:
+            try:
+                for f in json.loads(order.frames_data):
+                    if isinstance(f, dict):
+                        extras_frames.append({
+                            'baguette_id': f.get('baguette_id'),
+                            'x1': f.get('x1') or order.x1,
+                            'x2': f.get('x2') or order.x2,
+                        })
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not extras_frames and order.baguette_id:
+            extras_frames = [{'baguette_id': order.baguette_id, 'x1': order.x1, 'x2': order.x2}]
         extras_pps = [{'passepartout_id': p['id']} for p in restored_passepartouts]
         for fr in frames:
             pp = fr.get('passepartout')
