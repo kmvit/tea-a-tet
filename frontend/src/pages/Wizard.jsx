@@ -69,6 +69,7 @@ export const Wizard = () => {
     orderData.podramnik_id || ''
   );
   const [packageId, setPackageId] = useState(orderData.package_id || '');
+  const [packageQuantity, setPackageQuantity] = useState(orderData.package_quantity || 1);
   const [moldingId, setMoldingId] = useState(orderData.molding_id || '');
   const [moldingConsumption, setMoldingConsumption] = useState(
     orderData.molding_consumption || ''
@@ -580,6 +581,8 @@ export const Wizard = () => {
     } else {
       updates.package_id = null;
     }
+    // Пакет — самостоятельное поле, сохраняем всегда
+    updates.package_quantity = parseInt(packageQuantity) || 1;
 
     updateOrderData(updates);
     setCurrentStep(5);
@@ -1568,6 +1571,24 @@ export const Wizard = () => {
                             ))}
                           </select>
                         </div>
+                      </div>
+
+                      {/* Пакет — самостоятельное поле (не связано с упаковкой, в цену не идёт) */}
+                      <div className="wizard-section p-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Пакет (количество)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={packageQuantity}
+                          onChange={(e) => {
+                            const q = parseInt(e.target.value) || 1;
+                            setPackageQuantity(q);
+                            updateOrderData({ package_quantity: q });
+                          }}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                        />
                       </div>
                     </div>
 

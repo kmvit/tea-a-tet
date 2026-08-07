@@ -556,6 +556,9 @@ def create_order_api(request):
         if data.get('package_id'):
             order_data['package_id'] = data.get('package_id')
 
+        # Количество пакетов — самостоятельное поле (не связано с упаковкой)
+        order_data['package_quantity'] = data.get('package_quantity', 1) or 1
+
         # Натяжка опциональна
         if data.get('stretch_id'):
             order_data['stretch_id'] = data.get('stretch_id')
@@ -1083,6 +1086,7 @@ def get_order_detail(request, order_id):
                 'name': order.package.name,
                 'price': float(order.package.price),
             } if order.package else None,
+            'package_quantity': order.package_quantity or 1,
             'molding': {
                 'id': order.molding.id,
                 'name': order.molding.name,

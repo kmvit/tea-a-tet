@@ -31,6 +31,7 @@ export const Summary = () => {
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,
         package_id: orderData.package_id,
+        package_quantity: orderData.package_quantity,
         molding_id: orderData.molding_id,
         molding_consumption: orderData.molding_consumption,
         trosik_id: orderData.trosik_id,
