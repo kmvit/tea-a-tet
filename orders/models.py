@@ -166,6 +166,9 @@ class Order(models.Model):
     payment_method = models.CharField('Способ оплаты', max_length=50, blank=True, null=True, default='наличные')
     comment = models.TextField('Комментарий к заказу', blank=True, null=True)
     
+    # Количество копий заказа (N одинаковых изделий) — умножает всю цену и склад
+    quantity = models.PositiveIntegerField('Количество копий', default=1)
+
     # Ручная сложность (доп. сумма, вводится вручную и добавляется к цене)
     manual_complexity = models.DecimalField(
         'Сложность (вручную, руб)', max_digits=12, decimal_places=2, default=0,

@@ -12,11 +12,11 @@ export const Summary = () => {
   const [orderCreated, setOrderCreated] = useState(false);
   const [orderId, setOrderId] = useState(null);
 
-  // Пересчёт при изменении ручной сложности
+  // Пересчёт при изменении ручной сложности или количества копий
   useEffect(() => {
     calculateCurrentPrice();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderData.manual_complexity]);
+  }, [orderData.manual_complexity, orderData.quantity]);
 
   const handleCreateOrder = async () => {
     setLoading(true);
@@ -44,6 +44,7 @@ export const Summary = () => {
         advance_payment: orderData.advance_payment,
         comment: orderData.comment || null,
         manual_complexity: orderData.manual_complexity || 0,
+        quantity: orderData.quantity || 1,
       };
 
       if (orderData.frames && orderData.frames.length > 0) {
@@ -167,6 +168,25 @@ export const Summary = () => {
               {priceCalculation?.works && (
                 <WorksPanel works={priceCalculation.works} />
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Количество копий
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={orderData.quantity ?? 1}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value) || 1;
+                    updateOrderData({ quantity: v < 1 ? 1 : v });
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                  placeholder="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">Заказ на N одинаковых изделий — вся стоимость умножается на количество</p>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

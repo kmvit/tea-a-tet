@@ -444,13 +444,13 @@ class OrderExtrasCalculator:
                     return
                 rate = op.rate
                 name = label or op.name
-            total = rate * q
+            # Работы считаются на одно изделие; количество копий применяется к итогу
             works.append({
                 'operation_type': op_type,
                 'name': name,
                 'rate': float(rate),
-                'quantity': q,
-                'total': float(total),
+                'quantity': 1,
+                'total': float(rate),
             })
 
         # Рама: тип работы = число рам (1→рама, 2→двойная, 3→тройная), размер внешней рамы
@@ -560,7 +560,7 @@ class OrderExtrasCalculator:
         return cls.compute(frames=extras_frames, passepartouts=pps, x1=order.x1, x2=order.x2, data=data)
 
     @staticmethod
-    def apply(calculation: Dict, extras: Dict) -> Dict:
+    def apply(calculation: Dict, extras: Dict, quantity: int = 1) -> Dict:
         """
         Включает работы в стоимость заказа (все работы оплачивает клиент).
         Сложность рамы/паспарту/крепления входит в цену как соответствующая
@@ -569,13 +569,16 @@ class OrderExtrasCalculator:
         """
         works = extras['works']
         manual = extras.get('manual_complexity') or 0
-        total = float(calculation.get('total_price', 0)) + works['total_rate'] + manual
+        qty = int(quantity or 1) or 1
+        # Цена одного изделия × количество копий
+        per_copy = float(calculation.get('total_price', 0)) + works['total_rate'] + manual
         if manual > 0:
             calculation.setdefault('components', {})['manual_complexity'] = {
                 'name': 'Сложность', 'total_price': manual
             }
-        calculation['total_price'] = total
+        calculation['total_price'] = per_copy * qty
         calculation['works'] = works
+        calculation['quantity'] = qty
         return calculation
 
 
@@ -583,11 +586,13 @@ class StockDeduction:
     """Списание материалов со склада при создании заказа"""
 
     @staticmethod
-    def deduct_from_order(order_data: Dict[str, Any], frames: List[Dict], passepartouts: Optional[List[Dict]] = None) -> None:
+    def deduct_from_order(order_data: Dict[str, Any], frames: List[Dict], passepartouts: Optional[List[Dict]] = None, quantity: int = 1) -> None:
         """
         Списывает материалы со склада на основе данных заказа.
         Использует F() для атомарного обновления (защита от гонок).
+        Количество копий (quantity) умножает расход всех материалов.
         """
+        qmul = int(quantity or 1) or 1
         x1 = order_data.get('x1') or Decimal('0')
         x2 = order_data.get('x2') or Decimal('0')
 
@@ -641,7 +646,7 @@ class StockDeduction:
 
         # Списание багета
         for bid, qty in baguette_consumption.items():
-            Baguette.objects.filter(pk=bid).update(stock_quantity=F('stock_quantity') - qty)
+            Baguette.objects.filter(pk=bid).update(stock_quantity=F('stock_quantity') - qty * qmul)
 
         # Площадь стекла (все рамы)
         if frames:
@@ -657,6 +662,7 @@ class StockDeduction:
             total_glass_area = sum(PriceCalculator.calculate_glass_area(a, b) for a, b in frame_sizes)
         else:
             total_glass_area = PriceCalculator.calculate_glass_area(x1, x2)
+        total_glass_area = total_glass_area * qmul  # расход на все копии
 
         # Стекло
         if order_data.get('glass_id') and total_glass_area > 0:
@@ -674,7 +680,7 @@ class StockDeduction:
         if order_data.get('hardware_id'):
             hq = order_data.get('hardware_quantity') or 1
             Hardware.objects.filter(pk=order_data['hardware_id']).update(
-                stock_quantity=F('stock_quantity') - hq
+                stock_quantity=F('stock_quantity') - hq * qmul
             )
 
         # Подрамник (как по раме - погонные метры)
@@ -692,38 +698,38 @@ class StockDeduction:
             else:
                 total_podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
             Podramnik.objects.filter(pk=order_data['podramnik_id']).update(
-                stock_quantity=F('stock_quantity') - total_podramnik_qty
+                stock_quantity=F('stock_quantity') - total_podramnik_qty * qmul
             )
 
-        # Упаковка (1 шт)
+        # Упаковка (1 шт на копию)
         if order_data.get('package_id'):
             Package.objects.filter(pk=order_data['package_id']).update(
-                stock_quantity=F('stock_quantity') - 1
+                stock_quantity=F('stock_quantity') - qmul
             )
 
         # Паспарту
         for pid, qty in passepartout_consumption.items():
             Passepartout.objects.filter(pk=pid).update(
-                stock_quantity=F('stock_quantity') - qty
+                stock_quantity=F('stock_quantity') - qty * qmul
             )
 
         # Молдинг
         if order_data.get('molding_id') and order_data.get('molding_consumption'):
             Molding.objects.filter(pk=order_data['molding_id']).update(
-                stock_quantity=F('stock_quantity') - order_data['molding_consumption']
+                stock_quantity=F('stock_quantity') - order_data['molding_consumption'] * qmul
             )
 
         # Тросик
         if order_data.get('trosik_id') and order_data.get('trosik_length'):
             trosik_length_m = PriceCalculator.normalize_length_to_meters(Decimal(str(order_data['trosik_length'])))
             Trosik.objects.filter(pk=order_data['trosik_id']).update(
-                stock_quantity=F('stock_quantity') - trosik_length_m
+                stock_quantity=F('stock_quantity') - trosik_length_m * qmul
             )
 
         # Подвески
         if order_data.get('podveski_id') and order_data.get('podveski_quantity'):
             Podveski.objects.filter(pk=order_data['podveski_id']).update(
-                stock_quantity=F('stock_quantity') - order_data['podveski_quantity']
+                stock_quantity=F('stock_quantity') - order_data['podveski_quantity'] * qmul
             )
 
         # Натяжка (если используется вместо стекла — в данных может быть stretch_id)

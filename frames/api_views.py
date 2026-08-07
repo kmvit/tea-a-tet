@@ -426,7 +426,7 @@ def calculate_price_api(request):
             extras = OrderExtrasCalculator.compute(
                 frames=frames, passepartouts=passepartouts, x1=eff_x1, x2=eff_x2, data=data
             )
-            OrderExtrasCalculator.apply(result, extras)
+            OrderExtrasCalculator.apply(result, extras, quantity=data.get('quantity', 1))
             return Response(result)
         else:
             # Обратная совместимость: расчет для одной рамы
@@ -476,7 +476,7 @@ def calculate_price_api(request):
             extras = OrderExtrasCalculator.compute(
                 frames=single_frames, passepartouts=passepartouts, x1=x1, x2=x2, data=data
             )
-            OrderExtrasCalculator.apply(calculation, extras)
+            OrderExtrasCalculator.apply(calculation, extras, quantity=data.get('quantity', 1))
             return Response(calculation)
 
     except Exception as e:
@@ -700,7 +700,9 @@ def create_order_api(request):
             frames=frames, passepartouts=passepartouts,
             x1=order_data['x1'], x2=order_data['x2'], data=data
         )
-        OrderExtrasCalculator.apply(calculation, extras)
+        order_quantity = int(data.get('quantity') or 1) or 1
+        order_data['quantity'] = order_quantity
+        OrderExtrasCalculator.apply(calculation, extras, quantity=order_quantity)
 
         order_data['total_price'] = Decimal(str(calculation['total_price']))
         order_data['status'] = 'new'
@@ -737,7 +739,7 @@ def create_order_api(request):
         if data.get('stretch_id'):
             deduct_data['stretch_id'] = data['stretch_id']
         try:
-            StockDeduction.deduct_from_order(deduct_data, frames or [], passepartouts=passepartouts)
+            StockDeduction.deduct_from_order(deduct_data, frames or [], passepartouts=passepartouts, quantity=order_quantity)
         except Exception as deduct_err:
             # Логируем, но не отменяем заказ — заказ уже создан
             import logging
@@ -1047,7 +1049,7 @@ def get_order_detail(request, order_id):
             frames=extras_frames, passepartouts=extras_pps,
             x1=order.x1, x2=order.x2, data=extras_data,
         )
-        OrderExtrasCalculator.apply(calculation, extras)
+        OrderExtrasCalculator.apply(calculation, extras, quantity=order.quantity)
 
         order_data = {
             'id': order.pk,
@@ -1087,6 +1089,7 @@ def get_order_detail(request, order_id):
                 'price': float(order.package.price),
             } if order.package else None,
             'package_quantity': order.package_quantity or 1,
+            'quantity': order.quantity or 1,
             'molding': {
                 'id': order.molding.id,
                 'name': order.molding.name,

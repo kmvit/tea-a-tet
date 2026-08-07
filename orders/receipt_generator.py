@@ -529,7 +529,15 @@ def generate_receipt_word(order_id):
                 for run in para.runs:
                     run.font.size = Pt(8)
 
-    # Количество пакетов (справочно)
+    # Количество копий и пакетов (справочно)
+    if (order.quantity or 1) > 1:
+        row = details_table.add_row()
+        row.cells[2].text = "КОЛИЧЕСТВО КОПИЙ:"
+        row.cells[3].text = str(order.quantity)
+        for cell in row.cells:
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(8)
     row = details_table.add_row()
     row.cells[2].text = "ПАКЕТОВ:"
     row.cells[3].text = str(order.package_quantity or 1)
@@ -837,6 +845,8 @@ def generate_receipt_html(order_id):
         detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': work['name'], 'col6': format_number(work['total'])})
     if extras.get('manual_complexity', 0) > 0:
         detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ:', 'col6': format_number(extras['manual_complexity'])})
+    if (order.quantity or 1) > 1:
+        detail_rows.append({'component': True, 'col2': 'КОЛИЧЕСТВО КОПИЙ:', 'col3': str(order.quantity)})
     detail_rows.append({'component': True, 'col2': 'ПАКЕТОВ:', 'col3': str(order.package_quantity or 1)})
 
     customer_parts = []
