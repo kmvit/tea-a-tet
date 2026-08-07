@@ -556,6 +556,10 @@ def create_order_api(request):
         if data.get('package_id'):
             order_data['package_id'] = data.get('package_id')
 
+        # Натяжка опциональна
+        if data.get('stretch_id'):
+            order_data['stretch_id'] = data.get('stretch_id')
+
         # Опциональные компоненты
         if data.get('molding_id'):
             order_data['molding_id'] = data.get('molding_id')
@@ -969,13 +973,14 @@ def get_order_detail(request, order_id):
                 trosik_length=order.trosik_length,
                 podveski_id=order.podveski.id if order.podveski else None,
                 podveski_quantity=order.podveski_quantity,
+                stretch_id=order.stretch.id if order.stretch else None,
             )
-            
+
             # Добавляем остальные компоненты
             for key, value in other_calculation.get('components', {}).items():
                 result['components'][key] = value
                 result['total_price'] += Decimal(str(value.get('total_price', 0)))
-            
+
             calculation = result
         else:
             # Обратная совместимость: расчет для одной рамы
@@ -998,6 +1003,7 @@ def get_order_detail(request, order_id):
                 passepartout_id=order.passepartout.id if order.passepartout else None,
                 passepartout_length=order.passepartout_length,
                 passepartout_width=order.passepartout_width,
+                stretch_id=order.stretch.id if order.stretch else None,
             )
 
         # Автосложность (в цену) + работы (справочно) — пересчёт для детализации
@@ -1020,6 +1026,7 @@ def get_order_detail(request, order_id):
             'podramnik_id': order.podramnik_id,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
+            'stretch_id': order.stretch_id,
             'manual_complexity': order.manual_complexity,
             'quantity': 1,
         }
@@ -1045,6 +1052,11 @@ def get_order_detail(request, order_id):
                 'name': order.backing.name,
                 'price': float(order.backing.price),
             } if order.backing else None,
+            'stretch': {
+                'id': order.stretch.id,
+                'name': order.stretch.name,
+                'price_per_sqm': float(order.stretch.price_per_sqm),
+            } if order.stretch else None,
             'podramnik': {
                 'id': order.podramnik.id,
                 'name': order.podramnik.name,

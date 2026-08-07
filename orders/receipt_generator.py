@@ -327,6 +327,16 @@ def generate_receipt_word(order_id):
             }
             calculation['components']['glass'] = glass_calc
             calculation['total_price'] += Decimal(str(glass_calc['total_price']))
+        if order.stretch and total_glass_area > 0:
+            stretch = order.stretch
+            stretch_total = total_glass_area * stretch.price_per_sqm
+            calculation['components']['stretch'] = {
+                'name': stretch.name,
+                'area': float(total_glass_area),
+                'unit_price': float(stretch.price_per_sqm),
+                'total_price': float(stretch_total),
+            }
+            calculation['total_price'] += Decimal(str(stretch_total))
     else:
         calculation = PriceCalculator.calculate_total_price(
             x1=order.x1,
@@ -344,6 +354,7 @@ def generate_receipt_word(order_id):
             trosik_length=order.trosik_length,
             podveski_id=order.podveski.id if order.podveski else None,
             podveski_quantity=order.podveski_quantity,
+            stretch_id=order.stretch.id if order.stretch else None,
             passepartout_id=order.passepartout.id if order.passepartout else None,
             passepartout_length=order.passepartout_length,
             passepartout_width=order.passepartout_width,
@@ -709,6 +720,16 @@ def generate_receipt_html(order_id):
                 'total_price': float(total_glass_area * glass.price_per_sqm)
             }
             calculation['total_price'] += Decimal(str(calculation['components']['glass']['total_price']))
+        if order.stretch and total_glass_area > 0:
+            stretch = order.stretch
+            stretch_total = total_glass_area * stretch.price_per_sqm
+            calculation['components']['stretch'] = {
+                'name': stretch.name,
+                'area': float(total_glass_area),
+                'unit_price': float(stretch.price_per_sqm),
+                'total_price': float(stretch_total),
+            }
+            calculation['total_price'] += Decimal(str(stretch_total))
     else:
         calculation = PriceCalculator.calculate_total_price(
             x1=order.x1, x2=order.x2,
@@ -725,6 +746,7 @@ def generate_receipt_html(order_id):
             trosik_length=order.trosik_length,
             podveski_id=order.podveski.id if order.podveski else None,
             podveski_quantity=order.podveski_quantity,
+            stretch_id=order.stretch.id if order.stretch else None,
             passepartout_id=order.passepartout.id if order.passepartout else None,
             passepartout_length=order.passepartout_length,
             passepartout_width=order.passepartout_width,

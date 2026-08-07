@@ -26,6 +26,7 @@ export const Summary = () => {
         x2: orderData.x2,
         glass_id: orderData.glass_id,
         backing_id: orderData.backing_id,
+        stretch_id: orderData.stretch_id,
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,

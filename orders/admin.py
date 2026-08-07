@@ -22,11 +22,12 @@ class OrderAdmin(admin.ModelAdmin):
         }),
         ('Основные компоненты', {
             'fields': (
-                'baguette', 
-                'glass', 
-                'backing', 
+                'baguette',
+                'glass',
+                'backing',
+                'stretch',
                 'hardware', 'hardware_quantity',
-                'podramnik', 
+                'podramnik',
                 'package'
             )
         }),
