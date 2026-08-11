@@ -145,7 +145,7 @@ export const Summary = () => {
               {priceCalculation && priceCalculation.components && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                    Детализация стоимости
+                    Материалы
                   </h3>
                   <div className="space-y-2">
                     {Object.entries(priceCalculation.components).map(
@@ -161,6 +161,15 @@ export const Summary = () => {
                         </div>
                       )
                     )}
+                  </div>
+                  <div className="flex justify-between mt-2 pt-2 border-t border-gray-300 font-semibold text-gray-800">
+                    <span>Итого материалов</span>
+                    <span className="tabular-nums">
+                      {Object.values(priceCalculation.components)
+                        .reduce((s, c) => s + (c.total_price || 0), 0)
+                        .toFixed(2)}{' '}
+                      ₽
+                    </span>
                   </div>
                 </div>
               )}

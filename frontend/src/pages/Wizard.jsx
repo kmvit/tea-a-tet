@@ -578,11 +578,12 @@ export const Wizard = () => {
 
     if (packageId) {
       updates.package_id = parseInt(packageId);
+      // Количество привязано к упаковке
+      updates.package_quantity = parseInt(packageQuantity) || 1;
     } else {
       updates.package_id = null;
+      updates.package_quantity = 1;
     }
-    // Пакет — самостоятельное поле, сохраняем всегда
-    updates.package_quantity = parseInt(packageQuantity) || 1;
 
     updateOrderData(updates);
     setCurrentStep(5);
@@ -1319,7 +1320,7 @@ export const Wizard = () => {
                             <option value="">-- Выберите натяжку --</option>
                             {stretches.map((stretch) => (
                               <option key={stretch.id} value={stretch.id}>
-                                {stretch.name} ({stretch.price_per_sqm} ₽/кв.м)
+                                {stretch.name} ({stretch.price_per_meter} ₽/м)
                               </option>
                             ))}
                           </select>
@@ -1559,6 +1560,7 @@ export const Wizard = () => {
                               // Сразу обновляем orderData для пересчета цены
                               updateOrderData({
                                 package_id: newPackageId ? parseInt(newPackageId) : null,
+                                package_quantity: newPackageId ? (parseInt(packageQuantity) || 1) : 1,
                               });
                             }}
                             className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
@@ -1571,24 +1573,24 @@ export const Wizard = () => {
                             ))}
                           </select>
                         </div>
-                      </div>
-
-                      {/* Пакет — самостоятельное поле (не связано с упаковкой, в цену не идёт) */}
-                      <div className="wizard-section p-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Пакет (количество)
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={packageQuantity}
-                          onChange={(e) => {
-                            const q = parseInt(e.target.value) || 1;
-                            setPackageQuantity(q);
-                            updateOrderData({ package_quantity: q });
-                          }}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                        />
+                        {packageId && (
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Количество упаковки
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={packageQuantity}
+                              onChange={(e) => {
+                                const q = parseInt(e.target.value) || 1;
+                                setPackageQuantity(q);
+                                updateOrderData({ package_quantity: q });
+                              }}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -46,6 +46,34 @@ def format_number(value):
         return "—"
 
 
+def _scale_calc_by_copies(calculation, q):
+    """Умножает расход/стоимость материалов на количество копий (для детализации)."""
+    q = int(q or 1) or 1
+    if q <= 1:
+        return
+    for comp in calculation.get('components', {}).values():
+        for k in ('total_price', 'area', 'quantity', 'consumption', 'length'):
+            v = comp.get(k)
+            if isinstance(v, (int, float)):
+                comp[k] = v * q
+    tp = calculation.get('total_price', 0)
+    calculation['total_price'] = tp * q
+
+
+def _scale_extras_by_copies(extras, q):
+    """Умножает стоимость работ и сложность на количество копий."""
+    q = int(q or 1) or 1
+    if q <= 1:
+        return
+    works = extras.get('works', {})
+    for w in works.get('items', []):
+        w['total'] = w['total'] * q
+    if 'total_rate' in works:
+        works['total_rate'] = works['total_rate'] * q
+    if extras.get('manual_complexity'):
+        extras['manual_complexity'] = extras['manual_complexity'] * q
+
+
 def add_horizontal_line(doc):
     """Добавляет горизонтальную пунктирную линию для отрыва"""
     para = doc.add_paragraph()
@@ -150,8 +178,8 @@ def generate_receipt_word(order_id):
     ip_info.add_run('картин, постеров, фотографий,\n').font.size = Pt(6)
     ip_info.add_run('гобеленов и вышивок.\n').font.size = Pt(6)
     ip_info.add_run('г.Пятигорск, ул.Дзержинского, д.49А\n').font.size = Pt(6)
-    ip_info.add_run('тел: 33-71-75, 8-918-749-04-69\n').font.size = Pt(6)
-    ip_info.add_run('10:00 -18:00. Без выходных.').font.size = Pt(6)
+    ip_info.add_run('тел: 33-71-75\n').font.size = Pt(6)
+    ip_info.add_run('11:00 - 18:00. Выходной: понедельник.').font.size = Pt(6)
     
     # Убираем границы таблицы для более чистого вида
     tbl = client_table._tbl
@@ -306,6 +334,7 @@ def generate_receipt_word(order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             package_id=order.package.id if order.package else None,
+            package_quantity=order.package_quantity or 1,
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -327,16 +356,8 @@ def generate_receipt_word(order_id):
             }
             calculation['components']['glass'] = glass_calc
             calculation['total_price'] += Decimal(str(glass_calc['total_price']))
-        if order.stretch and total_glass_area > 0:
-            stretch = order.stretch
-            stretch_total = total_glass_area * stretch.price_per_sqm
-            calculation['components']['stretch'] = {
-                'name': stretch.name,
-                'area': float(total_glass_area),
-                'unit_price': float(stretch.price_per_sqm),
-                'total_price': float(stretch_total),
-            }
-            calculation['total_price'] += Decimal(str(stretch_total))
+        # Натяжка — работа мастера (по периметру), выводится строкой «РАБОТА» из extras,
+        # как материал по площади здесь не считается.
     else:
         calculation = PriceCalculator.calculate_total_price(
             x1=order.x1,
@@ -348,6 +369,7 @@ def generate_receipt_word(order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             package_id=order.package.id if order.package else None,
+            package_quantity=order.package_quantity or 1,
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -360,10 +382,14 @@ def generate_receipt_word(order_id):
             passepartout_width=order.passepartout_width,
         )
     
+    # Количество копий: масштабируем расход/стоимость материалов
+    copies = int(order.quantity or 1) or 1
+    _scale_calc_by_copies(calculation, copies)
+
     # Создаем таблицу с деталями заказа
     details_table = doc.add_table(rows=1, cols=7)
     details_table.style = 'Table Grid'
-    
+
     # Заголовки (компактные)
     detail_headers = ['Кол-во', 'Время', '', 'размер', 'ширина', 'цена', 'стоимость']
     detail_header_cells = details_table.rows[0].cells
@@ -373,6 +399,22 @@ def generate_receipt_word(order_id):
         detail_header_cells[i].paragraphs[0].runs[0].font.size = Pt(8)
         detail_header_cells[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
     
+    # Хелпер для служебных строк (заголовки разделов и подытоги)
+    def _add_special_row(label, price=None, bold=True):
+        r = details_table.add_row()
+        r.cells[2].text = label
+        if price is not None:
+            r.cells[6].text = f"{format_number(price)} руб"
+        for c in r.cells:
+            for para in c.paragraphs:
+                for run in para.runs:
+                    run.font.size = Pt(8)
+                    run.font.bold = bold
+        return r
+
+    # ---------- Раздел «Материалы» ----------
+    _add_special_row('МАТЕРИАЛЫ')
+
     # Добавляем данные о рамах
     frame_count = len(frames) if frames else 1
     has_frames = False
@@ -396,14 +438,16 @@ def generate_receipt_word(order_id):
             rx2 = Decimal(str(frame_data_local.get('x2', order.x2))) if frame_data_local.get('x2') else order.x2
             if not rx1 or not rx2 or rx1 <= 0 or rx2 <= 0:
                 rx1, rx2 = order.x1, order.x2
-            baguette_width_cm = baguette.width * 100  # Переводим метры в см
+            # Ширина багета в метрах — функция ждёт метры (периметр_м + 8×ширина_м)
             baguette_quantity = PriceCalculator.calculate_baguette_quantity(
-                rx1, rx2, baguette_width_cm
+                rx1, rx2, baguette.width
             )
+            # Расход и стоимость — на все копии
+            baguette_quantity = baguette_quantity * copies
             baguette_price = baguette_quantity * baguette.price
 
             row = details_table.add_row()
-            row.cells[0].text = "1"
+            row.cells[0].text = str(copies)
             row.cells[1].text = "0.6"
             row.cells[2].text = f"Рама {frame_idx + 1}"
             row.cells[3].text = f"{format_number(rx1)}×{format_number(rx2)} см"
@@ -463,7 +507,7 @@ def generate_receipt_word(order_id):
         'backing': ('ПОДКЛАДКА:', None, None),
         'hardware': ('ФУРНИТУРА:', 'quantity', 'шт'),
         'podramnik': ('ПОДРАМНИК:', None, None),
-        'package': ('УПАКОВКА:', None, None),
+        'package': ('УПАКОВКА:', 'quantity', 'шт'),
         'molding': ('МОЛДИНГ:', 'consumption', 'м'),
         'trosik': ('ТРОСИК:', 'length', 'м'),
         'podveski': ('ПОДВЕСКИ:', 'quantity', 'шт'),
@@ -507,9 +551,19 @@ def generate_receipt_word(order_id):
                     for run in para.runs:
                         run.font.size = Pt(8)
     
+    # Подытог по материалам (calculation['total_price'] = сумма материалов)
+    materials_total = Decimal(str(calculation.get('total_price', 0)))
+    _add_special_row('ИТОГО МАТЕРИАЛОВ:', price=materials_total)
+
+    # ---------- Раздел «Работы» ----------
+    _add_special_row('РАБОТЫ')
+
     # Работы (входят в стоимость) — по данным справочника технологических операций
     extras = OrderExtrasCalculator.for_order(order, frames)
+    _scale_extras_by_copies(extras, copies)
+    works_total = Decimal('0')
     for work in extras['works']['items']:
+        works_total += Decimal(str(work['total']))
         row = details_table.add_row()
         row.cells[2].text = "РАБОТА:"
         row.cells[3].text = work['name']
@@ -521,6 +575,7 @@ def generate_receipt_word(order_id):
 
     # Ручная сложность
     if extras.get('manual_complexity', 0) > 0:
+        works_total += Decimal(str(extras['manual_complexity']))
         row = details_table.add_row()
         row.cells[2].text = "СЛОЖНОСТЬ:"
         row.cells[6].text = f"{format_number(extras['manual_complexity'])} руб"
@@ -528,6 +583,9 @@ def generate_receipt_word(order_id):
             for para in cell.paragraphs:
                 for run in para.runs:
                     run.font.size = Pt(8)
+
+    # Подытог по работам
+    _add_special_row('ИТОГО РАБОТ:', price=works_total)
 
     # Количество копий и пакетов (справочно)
     if (order.quantity or 1) > 1:
@@ -538,13 +596,7 @@ def generate_receipt_word(order_id):
             for para in cell.paragraphs:
                 for run in para.runs:
                     run.font.size = Pt(8)
-    row = details_table.add_row()
-    row.cells[2].text = "ПАКЕТОВ:"
-    row.cells[3].text = str(order.package_quantity or 1)
-    for cell in row.cells:
-        for para in cell.paragraphs:
-            for run in para.runs:
-                run.font.size = Pt(8)
+    # Количество упаковки показывается в строке «УПАКОВКА» (компонент package).
 
     add_table_border(details_table)
     
@@ -556,7 +608,7 @@ def generate_receipt_word(order_id):
                 para.paragraph_format.space_before = Pt(1)
     
     # Итого (компактно)
-    total_para = doc.add_paragraph(f'Итого: {format_number(order.total_price)} руб')
+    total_para = doc.add_paragraph(f'ИТОГО ПО ЗАКАЗУ: {format_number(order.total_price)} руб')
     total_para.runs[0].font.bold = True
     total_para.runs[0].font.size = Pt(11)
     total_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -574,78 +626,8 @@ def generate_receipt_word(order_id):
         comment_para.paragraph_format.space_before = Pt(3)
         comment_para.paragraph_format.space_after = Pt(2)
     
-    # Подписи (компактно)
-    # Создаем таблицу для подписей
-    signs_table = doc.add_table(rows=1, cols=2)
-    signs_table.style = 'Table Grid'
-    
-    # Левая колонка - подпись заказчика
-    left_sign = signs_table.rows[0].cells[0]
-    left_sign.add_paragraph('Подпись заказчика:').runs[0].font.size = Pt(9)
-    left_sign.add_paragraph()  # Место для подписи
-    left_sign.add_paragraph()  # Место для подписи
-    
-    # Правая колонка - подпись столяра
-    right_sign = signs_table.rows[0].cells[1]
-    right_sign.add_paragraph('Подпись столяра:').runs[0].font.size = Pt(9)
-    right_sign.add_paragraph()  # Место для подписи
-    right_sign.add_paragraph()  # Место для подписи
-    
-    # Убираем границы таблицы подписей
-    tbl3 = signs_table._tbl
-    tblPr3 = tbl3.tblPr
-    if tblPr3 is None:
-        tblPr3 = OxmlElement('w:tblPr')
-        tbl3.insert(0, tblPr3)
-    
-    tblBorders3 = OxmlElement('w:tblBorders')
-    for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
-        border = OxmlElement(f'w:{border_name}')
-        border.set(qn('w:val'), 'nil')
-        tblBorders3.append(border)
-    tblPr3.append(tblBorders3)
-    
-    # Уменьшаем отступы
-    for row in signs_table.rows:
-        for cell in row.cells:
-            for para in cell.paragraphs:
-                para.paragraph_format.space_after = Pt(1)
-                para.paragraph_format.space_before = Pt(1)
-    
-    # Схема рамы в конце квитанции — все рамы
-    frames_for_diagram = []
-    if order.frames_data:
-        try:
-            frames_for_diagram = json.loads(order.frames_data)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    if not frames_for_diagram:
-        frames_for_diagram = [{}]
-    diagram_para = doc.add_paragraph()
-    diagram_para.add_run('Схема рамы:').font.bold = True
-    diagram_para.runs[0].font.size = Pt(7)
-    diagram_para.paragraph_format.space_before = Pt(6)
-    diagram_para.paragraph_format.space_after = Pt(1)
-    frame_diagram = doc.add_table(rows=1, cols=1)
-    frame_diagram.style = 'Table Grid'
-    for fi, fd in enumerate(frames_for_diagram):
-        rx1 = format_number(fd.get('x1') or order.x1)
-        rx2 = format_number(fd.get('x2') or order.x2)
-        pp_l = float(fd.get('passepartout_length') or 0) if fd.get('passepartout_id') else float(order.passepartout_length or 0)
-        pp_w = float(fd.get('passepartout_width') or 0) if fd.get('passepartout_id') else float(order.passepartout_width or 0)
-        dim_run = frame_diagram.rows[0].cells[0].add_paragraph()
-        dim_run.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        txt = f'Рама {fi + 1}: {rx1} × {rx2} см'
-        if pp_l > 0 and pp_w > 0:
-            txt += f' | Паспарту: {format_number(pp_l)}×{format_number(pp_w)} см'
-        r = dim_run.add_run(txt)
-        r.font.size = Pt(7)
-    for row in frame_diagram.rows:
-        for cell in row.cells:
-            for para in cell.paragraphs:
-                para.paragraph_format.space_after = Pt(0)
-                para.paragraph_format.space_before = Pt(0)
-    
+    # Подписи заказчика/столяра и схема рам убраны по требованию.
+
     # Сохраняем в BytesIO
     doc_io = BytesIO()
     doc.save(doc_io)
@@ -717,6 +699,7 @@ def generate_receipt_html(order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             package_id=order.package.id if order.package else None,
+            package_quantity=order.package_quantity or 1,
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -737,16 +720,8 @@ def generate_receipt_html(order_id):
                 'total_price': float(total_glass_area * glass.price_per_sqm)
             }
             calculation['total_price'] += Decimal(str(calculation['components']['glass']['total_price']))
-        if order.stretch and total_glass_area > 0:
-            stretch = order.stretch
-            stretch_total = total_glass_area * stretch.price_per_sqm
-            calculation['components']['stretch'] = {
-                'name': stretch.name,
-                'area': float(total_glass_area),
-                'unit_price': float(stretch.price_per_sqm),
-                'total_price': float(stretch_total),
-            }
-            calculation['total_price'] += Decimal(str(stretch_total))
+        # Натяжка — работа мастера (по периметру), выводится строкой «РАБОТА» из extras,
+        # как материал по площади здесь не считается.
     else:
         calculation = PriceCalculator.calculate_total_price(
             x1=order.x1, x2=order.x2,
@@ -757,6 +732,7 @@ def generate_receipt_html(order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             package_id=order.package.id if order.package else None,
+            package_quantity=order.package_quantity or 1,
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -769,13 +745,17 @@ def generate_receipt_html(order_id):
             passepartout_width=order.passepartout_width,
         )
 
+    # Количество копий: масштабируем расход/стоимость материалов
+    copies = int(order.quantity or 1) or 1
+    _scale_calc_by_copies(calculation, copies)
+
     frame_count = len(frames) if frames else 1
     components_map = {
         'glass': ('СТЕКЛО:', 'area', 'кв.м'),
         'backing': ('ПОДКЛАДКА:', None, None),
         'hardware': ('ФУРНИТУРА:', 'quantity', 'шт'),
         'podramnik': ('ПОДРАМНИК:', None, None),
-        'package': ('УПАКОВКА:', None, None),
+        'package': ('УПАКОВКА:', 'quantity', 'шт'),
         'molding': ('МОЛДИНГ:', 'consumption', 'м'),
         'trosik': ('ТРОСИК:', 'length', 'м'),
         'podveski': ('ПОДВЕСКИ:', 'quantity', 'шт'),
@@ -786,6 +766,7 @@ def generate_receipt_html(order_id):
 
     from frames.models import Baguette
     detail_rows = []
+    detail_rows.append({'section': True, 'col2': 'МАТЕРИАЛЫ'})
     has_frames = False
     for frame_idx in range(frame_count):
         if frames:
@@ -801,11 +782,11 @@ def generate_receipt_html(order_id):
             rx2 = Decimal(str(frame_data_local.get('x2', order.x2))) if frame_data_local.get('x2') else order.x2
             if not rx1 or not rx2 or rx1 <= 0 or rx2 <= 0:
                 rx1, rx2 = order.x1, order.x2
-            baguette_width_cm = baguette.width * 100
-            baguette_quantity = PriceCalculator.calculate_baguette_quantity(rx1, rx2, baguette_width_cm)
+            # Ширина багета хранится в метрах — формула ждёт метры (периметр_м + 8×ширина_м)
+            baguette_quantity = PriceCalculator.calculate_baguette_quantity(rx1, rx2, baguette.width) * copies
             baguette_price = baguette_quantity * baguette.price
             detail_rows.append({
-                'cells': ['1', '0.6', f'Рама {frame_idx + 1}', f'{format_number(rx1)}×{format_number(rx2)} см',
+                'cells': [str(copies), '0.6', f'Рама {frame_idx + 1}', f'{format_number(rx1)}×{format_number(rx2)} см',
                           format_number(baguette.width), format_number(baguette.price), format_number(baguette_price)],
                 'desc': {'col2': f'Багет: {baguette.name}', 'col3': f'расход {format_number(baguette_quantity)} м'}
             })
@@ -839,15 +820,25 @@ def generate_receipt_html(order_id):
         if key.startswith('passepartout_frame'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'ПАСПАРТУ:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
+    # Подытог по материалам и переход к разделу «Работы»
+    materials_total = Decimal(str(calculation.get('total_price', 0)))
+    detail_rows.append({'subtotal': True, 'col2': 'ИТОГО МАТЕРИАЛОВ:', 'col6': format_number(materials_total)})
+    detail_rows.append({'section': True, 'col2': 'РАБОТЫ'})
+
     # Работы (входят в стоимость) — по данным справочника технологических операций
     extras = OrderExtrasCalculator.for_order(order, frames)
+    _scale_extras_by_copies(extras, copies)
+    works_total = Decimal('0')
     for work in extras['works']['items']:
+        works_total += Decimal(str(work['total']))
         detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': work['name'], 'col6': format_number(work['total'])})
     if extras.get('manual_complexity', 0) > 0:
+        works_total += Decimal(str(extras['manual_complexity']))
         detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ:', 'col6': format_number(extras['manual_complexity'])})
+    detail_rows.append({'subtotal': True, 'col2': 'ИТОГО РАБОТ:', 'col6': format_number(works_total)})
     if (order.quantity or 1) > 1:
         detail_rows.append({'component': True, 'col2': 'КОЛИЧЕСТВО КОПИЙ:', 'col3': str(order.quantity)})
-    detail_rows.append({'component': True, 'col2': 'ПАКЕТОВ:', 'col3': str(order.package_quantity or 1)})
+    # Количество упаковки показывается в строке «УПАКОВКА» (компонент package).
 
     customer_parts = []
     if order.customer_name:
@@ -856,51 +847,18 @@ def generate_receipt_html(order_id):
         customer_parts.append(order.customer_phone)
     customer_info = 'Клиент: ' + ' '.join(customer_parts) if customer_parts else 'Клиент: —'
 
-    # Схема: все рамы с размерами и паспарту (из полей заказа)
-    scale = 2.5
-    pad = 18
-    gap = 15
-    frame_svgs = []
-    frame_labels = []
-    frames_for_diag = frames if frames else [{}]
-    total_w = 0
-    max_h = 0
-    for fi in range(len(frames_for_diag)):
-        fd = frames_for_diag[fi]
-        rx1 = float(fd.get('x1') or order.x1)
-        rx2 = float(fd.get('x2') or order.x2)
-        pp_len = float(fd.get('passepartout_length') or 0) if fd.get('passepartout_id') else float(order.passepartout_length or 0)
-        pp_wid = float(fd.get('passepartout_width') or 0) if fd.get('passepartout_id') else float(order.passepartout_width or 0)
-        has_pp = pp_len > 0 and pp_wid > 0
-        w, h = rx1 * scale, rx2 * scale
-        x_off = total_w + pad if fi == 0 else total_w + gap
-        total_w = x_off + w + pad
-        max_h = max(max_h, h + pad * 2)
-        svg_part = f'''<g transform="translate({x_off},{pad})">
-  <rect x="0" y="0" width="{w}" height="{h}" fill="none" stroke="#000" stroke-width="1"/>
-  <text x="{w/2}" y="-3" text-anchor="middle">{format_number(rx1)}</text>
-  <text x="{w + 4}" y="{h/2}" text-anchor="middle" transform="rotate(90,{w + 4},{h/2})">{format_number(rx2)}</text>
-  <text x="{w/2}" y="{h + 8}" text-anchor="middle">{format_number(rx1)}</text>
-  <text x="-4" y="{h/2}" text-anchor="middle" transform="rotate(-90,-4,{h/2})">{format_number(rx2)}</text>
-</g>'''
-        frame_svgs.append(svg_part)
-        lbl = f'Рама {fi + 1}: {format_number(rx1)}×{format_number(rx2)} см'
-        if has_pp:
-            lbl += f' | Паспарту: {format_number(pp_len)}×{format_number(pp_wid)} см'
-        frame_labels.append(lbl)
-    svg_w = int(total_w)
-    svg_h = int(max_h)
-    frame_svg = f'''<svg width="{svg_w}" height="{svg_h}" style="display:block;margin:4px auto;font-size:7pt">
-{chr(10).join(frame_svgs)}
-</svg>
-<p style="text-align:center;font-size:7pt;margin-top:1px">{" | ".join(frame_labels)}</p>'''
+    # Схема рам убрана по требованию.
 
     def esc(s):
         return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
     html_rows = ''
     for r in detail_rows:
-        if 'cells' in r:
+        if r.get('section'):
+            html_rows += f'''<tr style="background:#f0f0f0;font-weight:bold"><td colspan="7">{esc(r.get('col2',''))}</td></tr>'''
+        elif r.get('subtotal'):
+            html_rows += f'''<tr style="font-weight:bold"><td></td><td></td><td>{esc(r.get('col2',''))}</td><td></td><td></td><td></td><td class="right">{esc(r.get('col6',''))} руб</td></tr>'''
+        elif 'cells' in r:
             html_rows += f'''<tr><td>{esc(r['cells'][0])}</td><td>{esc(r['cells'][1])}</td><td>{esc(r['cells'][2])}</td>
                 <td>{esc(r['cells'][3])}</td><td>{esc(r['cells'][4])}</td><td>{esc(r['cells'][5])}</td><td>{esc(r['cells'][6])}</td></tr>'''
             if r.get('desc'):
@@ -939,7 +897,7 @@ th {{ text-align: center; font-weight: bold; }}
 </td><td style="border:none;text-align:right;vertical-align:top" class="ip-info">
 ИП Караковский С.М.<br>ОГРН ИП:304263203300215<br>ИНН:263204326063<br>
 Профессиональное оформление<br>картин, постеров, фотографий,<br>гобеленов и вышивок.<br>
-г.Пятигорск, ул.Дзержинского, д.49А<br>тел: 33-71-75, 8-918-749-04-69<br>10:00 -18:00. Без выходных.
+г.Пятигорск, ул.Дзержинского, д.49А<br>тел: 33-71-75<br>11:00 - 18:00. Выходной: понедельник.
 </td></tr></table>
 <div class="dashed">──────────────────────────────────────────────────<br>ОТРЫВНАЯ ЧАСТЬ<br>──────────────────────────────────────────────────</div>
 <table style="border:none"><tr><td style="border:none;vertical-align:top">
@@ -953,16 +911,8 @@ th {{ text-align: center; font-weight: bold; }}
 <tr><th>Кол-во</th><th>Время</th><th></th><th>размер</th><th>ширина</th><th>цена</th><th>стоимость</th></tr>
 {html_rows}
 </table>
-<p class="total">Итого: {format_number(order.total_price)} руб</p>
+<p class="total">ИТОГО ПО ЗАКАЗУ: {format_number(order.total_price)} руб</p>
 {f'<p style="margin-top:10px;font-size:9pt"><b>Комментарий:</b> {esc(order.comment.strip())}</p>' if order.comment and order.comment.strip() else ''}
-<div class="signs">
-<div class="sign-box"><p>Подпись заказчика:</p><p><br></p><p><br></p></div>
-<div class="sign-box"><p>Подпись столяра:</p><p><br></p><p><br></p></div>
-</div>
-<div style="margin-top:20px;padding:6px;border:1px solid #ddd;border-radius:4px;background:#fafafa">
-<p style="font-weight:bold;font-size:8pt;margin-bottom:2px;text-align:center">Схема рамы</p>
-{frame_svg}
-</div>
 <script>window.onload=function(){{window.print();}}</script>
 </body>
 </html>'''

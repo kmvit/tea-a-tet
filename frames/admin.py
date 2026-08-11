@@ -106,7 +106,7 @@ class PassepartoutAdmin(admin.ModelAdmin):
 
 @admin.register(Stretch)
 class StretchAdmin(admin.ModelAdmin):
-    list_display = ['name', 'price_per_sqm', 'stock_quantity', 'created_at']
+    list_display = ['name', 'price_per_meter', 'created_at']
     list_filter = ['created_at']
     search_fields = ['name']
     readonly_fields = ['created_at']

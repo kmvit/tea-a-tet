@@ -108,7 +108,7 @@ class Order(models.Model):
         blank=True,
         null=True
     )
-    package_quantity = models.PositiveIntegerField('Количество пакетов', default=1, blank=True, null=True)
+    package_quantity = models.PositiveIntegerField('Количество упаковки', default=1, blank=True, null=True)
 
     # Дополнительные компоненты (опциональные)
     molding = models.ForeignKey(

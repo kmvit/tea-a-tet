@@ -249,25 +249,25 @@ class Podveski(models.Model):
 
 
 class Stretch(models.Model):
-    """Модель натяжки"""
+    """Модель натяжки (тех.процесс мастера, расценка за метр периметра)"""
     name = models.CharField('Название', max_length=200)
-    price_per_sqm = models.DecimalField('Цена за кв.м (руб)', max_digits=10, decimal_places=2)
+    price_per_meter = models.DecimalField('Цена за метр (руб)', max_digits=10, decimal_places=2)
     stock_quantity = models.DecimalField(
         'Количество на складе (кв.м)',
         max_digits=12,
         decimal_places=2,
         default=0,
-        help_text='Фактическое наличие на складе в кв.м. Списывается при каждом заказе.'
+        help_text='Не используется: натяжка — работа мастера, материал приносит клиент, со склада не списывается.'
     )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
-    
+
     class Meta:
         verbose_name = 'Натяжка'
         verbose_name_plural = 'Натяжки'
         ordering = ['name']
-    
+
     def __str__(self):
-        return f"{self.name} ({self.price_per_sqm} руб/кв.м)"
+        return f"{self.name} ({self.price_per_meter} руб/м)"
 
 
 class Foamboard(models.Model):

@@ -213,7 +213,7 @@ def get_stretches(request):
         data.append({
             'id': stretch.pk,
             'name': stretch.name,
-            'price_per_sqm': float(stretch.price_per_sqm),
+            'price_per_meter': float(stretch.price_per_meter),
         })
     return Response(data)
 
@@ -351,6 +351,7 @@ def calculate_price_api(request):
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
                 package_id=data.get('package_id'),
+                package_quantity=data.get('package_quantity', 1),
                 molding_id=data.get('molding_id'),
                 molding_consumption=Decimal(str(data.get('molding_consumption'))) if data.get('molding_consumption') else None,
                 trosik_id=data.get('trosik_id'),
@@ -360,8 +361,10 @@ def calculate_price_api(request):
                 stretch_id=None,
             )
 
-            # Стекло и натяжка — по суммарной площади, если рам несколько с разными размерами
-            from frames.models import Glass, Stretch
+            # Стекло — по суммарной площади, если рам несколько с разными размерами.
+            # Натяжка здесь НЕ считается: это работа мастера по периметру,
+            # учитывается в OrderExtrasCalculator (ниже, через apply()).
+            from frames.models import Glass
             total_glass_area = sum(
                 PriceCalculator.calculate_glass_area(fx1, fx2) for fx1, fx2 in frame_sizes
             )
@@ -377,16 +380,6 @@ def calculate_price_api(request):
                     **glass_calc
                 }
                 result['total_price'] += Decimal(str(glass_calc['total_price']))
-            if data.get('stretch_id') and total_glass_area > 0:
-                stretch = Stretch.objects.get(pk=data['stretch_id'])
-                stretch_price = total_glass_area * stretch.price_per_sqm
-                result['components']['stretch'] = {
-                    'name': stretch.name,
-                    'area': float(total_glass_area),
-                    'unit_price': float(stretch.price_per_sqm),
-                    'total_price': float(stretch_price)
-                }
-                result['total_price'] += Decimal(str(stretch_price))
 
             # Подкладка — по суммарной площади всех рам
             if data.get('backing_id') and total_glass_area > 0:
@@ -440,6 +433,7 @@ def calculate_price_api(request):
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
                 package_id=data.get('package_id'),
+                package_quantity=data.get('package_quantity', 1),
                 molding_id=data.get('molding_id'),
                 molding_consumption=Decimal(str(data.get('molding_consumption'))) if data.get('molding_consumption') else None,
                 trosik_id=data.get('trosik_id'),
@@ -552,12 +546,12 @@ def create_order_api(request):
             order_data['hardware_id'] = data.get('hardware_id')
             order_data['hardware_quantity'] = data.get('hardware_quantity', 1)
         
-        # Упаковка опциональна
+        # Упаковка опциональна; количество упаковки привязано к её выбору
         if data.get('package_id'):
             order_data['package_id'] = data.get('package_id')
-
-        # Количество пакетов — самостоятельное поле (не связано с упаковкой)
-        order_data['package_quantity'] = data.get('package_quantity', 1) or 1
+            order_data['package_quantity'] = int(data.get('package_quantity', 1) or 1)
+        else:
+            order_data['package_quantity'] = 1
 
         # Натяжка опциональна
         if data.get('stretch_id'):
@@ -634,6 +628,7 @@ def create_order_api(request):
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
                 package_id=order_data.get('package_id'),
+                package_quantity=order_data.get('package_quantity', 1),
                 molding_id=order_data.get('molding_id'),
                 molding_consumption=order_data.get('molding_consumption'),
                 trosik_id=order_data.get('trosik_id'),
@@ -661,11 +656,8 @@ def create_order_api(request):
                 glass = Glass.objects.get(pk=order_data['glass_id'])
                 gp = _floor(total_glass_area * glass.price_per_sqm, MIN_GLASS_PRICE)
                 result['total_price'] += gp
-            if data.get('stretch_id') and total_glass_area > 0:
-                from frames.models import Stretch
-                stretch = Stretch.objects.get(pk=data['stretch_id'])
-                result['total_price'] += total_glass_area * stretch.price_per_sqm
-            
+            # Натяжка — работа мастера по периметру, учитывается в OrderExtrasCalculator ниже.
+
             calculation = result
         else:
             # Обратная совместимость: расчет для одной рамы
@@ -679,6 +671,7 @@ def create_order_api(request):
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
                 package_id=order_data.get('package_id'),
+                package_quantity=order_data.get('package_quantity', 1),
                 molding_id=order_data.get('molding_id'),
                 molding_consumption=order_data.get('molding_consumption'),
                 trosik_id=order_data.get('trosik_id'),
@@ -808,6 +801,7 @@ def get_order_detail(request, order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             package_id=order.package.id if order.package else None,
+            package_quantity=order.package_quantity or 1,
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -972,6 +966,7 @@ def get_order_detail(request, order_id):
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 package_id=order.package.id if order.package else None,
+                package_quantity=order.package_quantity or 1,
                 molding_id=order.molding.id if order.molding else None,
                 molding_consumption=order.molding_consumption,
                 trosik_id=order.trosik.id if order.trosik else None,
@@ -999,6 +994,7 @@ def get_order_detail(request, order_id):
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 package_id=order.package.id if order.package else None,
+                package_quantity=order.package_quantity or 1,
                 molding_id=order.molding.id if order.molding else None,
                 molding_consumption=order.molding_consumption,
                 trosik_id=order.trosik.id if order.trosik else None,
@@ -1070,7 +1066,7 @@ def get_order_detail(request, order_id):
             'stretch': {
                 'id': order.stretch.id,
                 'name': order.stretch.name,
-                'price_per_sqm': float(order.stretch.price_per_sqm),
+                'price_per_meter': float(order.stretch.price_per_meter),
             } if order.stretch else None,
             'podramnik': {
                 'id': order.podramnik.id,

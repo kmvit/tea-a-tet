@@ -38,14 +38,13 @@ class PriceCalculator:
     @staticmethod
     def calculate_baguette_quantity(x1: Decimal, x2: Decimal, width: Decimal) -> Decimal:
         """
-        Расчет количества багета по формуле: L + 8 * W,
-        где L = 2 * (X1 + X2) в метрах, W - ширина багета в метрах.
+        Расчёт расхода багета в метрах: периметр + запас на зарезку углов.
+        Размеры X1, X2 — в см, ширина багета — в метрах.
+        Периметр 2*(X1+X2) переводим в метры (÷100) и прибавляем 8*ширина.
+        Пример: 40×40, ширина 0.03 м → 1.6 + 8*0.03 = 1.84 м.
         """
-        # (X1 + X2) в см, переводим в метры
-        perimeter = ((x1 + x2) * 2) / 100
-        # Ширина багета хранится в метрах
-        total = perimeter + 8 * width
-        return total
+        perimeter_m = (x1 + x2) * 2 / 100
+        return perimeter_m + 8 * width
     
     @staticmethod
     def calculate_glass_area(x1: Decimal, x2: Decimal) -> Decimal:
@@ -99,20 +98,10 @@ class PriceCalculator:
         }
     
     @staticmethod
-    def calculate_stretch_price(
-        x1: Decimal, 
-        x2: Decimal, 
-        stretch: Stretch
-    ) -> Dict[str, Decimal]:
-        """Расчет стоимости натяжки"""
-        area = PriceCalculator.calculate_glass_area(x1, x2)
-        price = area * stretch.price_per_sqm
-        return {
-            'area': area,
-            'unit_price': stretch.price_per_sqm,
-            'total_price': price
-        }
-    
+    def calculate_perimeter_meters(x1: Decimal, x2: Decimal) -> Decimal:
+        """Периметр (по бортикам) в метрах: 2 * (X1 + X2) / 100."""
+        return (x1 + x2) * 2 / 100
+
     @staticmethod
     def calculate_total_price(
         x1: Decimal,
@@ -124,6 +113,7 @@ class PriceCalculator:
         hardware_quantity: int = 1,
         podramnik_id: Optional[int] = None,
         package_id: Optional[int] = None,
+        package_quantity: int = 1,
         molding_id: Optional[int] = None,
         molding_consumption: Optional[Decimal] = None,
         trosik_id: Optional[int] = None,
@@ -219,14 +209,18 @@ class PriceCalculator:
                 result['total_price'] += podramnik_price
                 selected_material_types.append('podramnik')
             
-            # Упаковка
+            # Упаковка (цена × количество упаковки)
             if package_id:
                 package = Package.objects.get(pk=package_id)
+                pkg_qty = int(package_quantity or 1) or 1
+                package_total = package.price * pkg_qty
                 result['components']['package'] = {
                     'name': package.name,
-                    'total_price': float(package.price)
+                    'quantity': pkg_qty,
+                    'unit_price': float(package.price),
+                    'total_price': float(package_total)
                 }
-                result['total_price'] += package.price
+                result['total_price'] += package_total
             
             # Опциональные компоненты
             
@@ -288,19 +282,10 @@ class PriceCalculator:
                 result['total_price'] += pp_price
                 selected_material_types.append('passepartout')
             
-            # Натяжка
-            if stretch_id:
-                stretch = Stretch.objects.get(pk=stretch_id)
-                stretch_calc = PriceCalculator.calculate_stretch_price(x1, x2, stretch)
-                result['components']['stretch'] = {
-                    'name': stretch.name,
-                    'area': float(stretch_calc['area']),
-                    'unit_price': float(stretch_calc['unit_price']),
-                    'total_price': float(stretch_calc['total_price'])
-                }
-                result['total_price'] += stretch_calc['total_price']
-                selected_material_types.append('stretch')
-            
+            # Натяжка НЕ материал: это работа мастера (тех.процесс), считается
+            # по периметру × цена за метр в OrderExtrasCalculator и НЕ списывается
+            # со склада. Здесь она намеренно не учитывается.
+
             # Работы больше НЕ входят в цену: технологические операции считаются
             # справочно в OrderExtrasCalculator (по данным 1С), а стоимость сборки
             # учитывается через «Сложность рамы/паспарту/крепления». Параметры
@@ -369,6 +354,7 @@ class OrderExtrasCalculator:
         base_max = max(b1x, b1y)
 
         # ---------- Сложность рамы (СложностьР) ----------
+        # Ширина багета в метрах (коэффициент 2000, как в 1С).
         R1 = (infos[0]['width'] * 2000) if n >= 1 else Decimal('0')
         R2 = (infos[1]['width'] * 2000) if n >= 2 else Decimal('0')
         R3 = (infos[2]['width'] * 2000) if n >= 3 else Decimal('0')
@@ -478,12 +464,21 @@ class OrderExtrasCalculator:
         if data.get('molding_id'):
             add_work('molding', 0)  # фиксированная расценка
 
-        # Натяжка: расценка из справочника по размеру (макс. сторона рамы),
-        # как у остальных работ. Площадь/склад считаются отдельно по кв.м.
+        # Натяжка: работа мастера по периметру картины (по бортикам).
+        # Расценка за метр берётся из справочника натяжек (у каждого материала своя),
+        # материал приносит клиент — со склада ничего не списывается.
         if data.get('stretch_id'):
-            add_work('stretch', base_max, label='Натяжка')
+            stretch = Stretch.objects.filter(pk=data['stretch_id']).first()
+            if stretch:
+                perimeter_m = PriceCalculator.calculate_perimeter_meters(b1x, b1y)
+                add_work(
+                    'stretch', 0,
+                    label=f'Натяжка ({stretch.name})',
+                    rate_override=perimeter_m * stretch.price_per_meter,
+                )
 
-        # Упаковка: расценка = Окр(цена_упаковки / 2)
+        # Упаковка: расценка = Окр(цена_упаковки / 2). Количество упаковки на эту
+        # работу не влияет — оно умножает только стоимость самих пакетов (материал).
         if data.get('package_id'):
             package = Package.objects.filter(pk=data['package_id']).first()
             if package:
@@ -553,6 +548,7 @@ class OrderExtrasCalculator:
             'podramnik_id': order.podramnik_id,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
+            'package_quantity': order.package_quantity,
             'stretch_id': order.stretch_id,
             'manual_complexity': order.manual_complexity,
             'quantity': 1,
@@ -570,13 +566,25 @@ class OrderExtrasCalculator:
         works = extras['works']
         manual = extras.get('manual_complexity') or 0
         qty = int(quantity or 1) or 1
-        # Цена одного изделия × количество копий
-        per_copy = float(calculation.get('total_price', 0)) + works['total_rate'] + manual
-        if manual > 0:
+        materials_per_copy = float(calculation.get('total_price', 0))
+        # Количество копий умножает расход/стоимость каждого материала и работы,
+        # чтобы строки детализации сходились с общим итогом.
+        if qty > 1:
+            for comp in calculation.get('components', {}).values():
+                for k in ('total_price', 'area', 'quantity', 'consumption', 'length'):
+                    v = comp.get(k)
+                    if isinstance(v, (int, float)):
+                        comp[k] = v * qty
+            for w in works.get('items', []):
+                w['total'] = w['total'] * qty
+            works['total_rate'] = works['total_rate'] * qty
+            works['work_time_hours'] = round(works['work_time_hours'] * qty, 2)
+        manual_total = manual * qty
+        if manual_total > 0:
             calculation.setdefault('components', {})['manual_complexity'] = {
-                'name': 'Сложность', 'total_price': manual
+                'name': 'Сложность', 'total_price': manual_total
             }
-        calculation['total_price'] = per_copy * qty
+        calculation['total_price'] = materials_per_copy * qty + works['total_rate'] + manual_total
         calculation['works'] = works
         calculation['quantity'] = qty
         return calculation
@@ -701,10 +709,11 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - total_podramnik_qty * qmul
             )
 
-        # Упаковка (1 шт на копию)
+        # Упаковка (количество упаковки × копии)
         if order_data.get('package_id'):
+            pkg_qty = int(order_data.get('package_quantity') or 1) or 1
             Package.objects.filter(pk=order_data['package_id']).update(
-                stock_quantity=F('stock_quantity') - qmul
+                stock_quantity=F('stock_quantity') - pkg_qty * qmul
             )
 
         # Паспарту
@@ -732,9 +741,4 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - order_data['podveski_quantity'] * qmul
             )
 
-        # Натяжка (если используется вместо стекла — в данных может быть stretch_id)
-        stretch_id = order_data.get('stretch_id')
-        if stretch_id and total_glass_area > 0:
-            Stretch.objects.filter(pk=stretch_id).update(
-                stock_quantity=F('stock_quantity') - total_glass_area
-            )
+        # Натяжка со склада НЕ списывается: это работа мастера, материал приносит клиент.
