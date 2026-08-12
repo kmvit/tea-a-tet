@@ -103,12 +103,38 @@ class PriceCalculator:
         return (x1 + x2) * 2 / 100
 
     @staticmethod
+    def price_backings(backing_ids, area):
+        """
+        Считает список подкладок по площади (у всех одна площадь рамы).
+        Возвращает (components, total). Ключи: backing, backing_2, backing_3...
+        """
+        comps = {}
+        total = Decimal('0')
+        for i, bid in enumerate(backing_ids or []):
+            if not bid:
+                continue
+            backing = Backing.objects.filter(pk=bid).first()
+            if not backing:
+                continue
+            price = _floor(backing.price * area, MIN_BACKING_PRICE)
+            key = 'backing' if i == 0 else f'backing_{i + 1}'
+            comps[key] = {
+                'name': backing.name,
+                'area': float(area),
+                'unit_price': float(backing.price),
+                'total_price': float(price),
+            }
+            total += price
+        return comps, total
+
+    @staticmethod
     def calculate_total_price(
         x1: Decimal,
         x2: Decimal,
         baguette_id: Optional[int] = None,
         glass_id: Optional[int] = None,
         backing_id: Optional[int] = None,
+        backing_ids: Optional[List[int]] = None,
         hardware_id: Optional[int] = None,
         hardware_quantity: int = 1,
         podramnik_id: Optional[int] = None,
@@ -168,18 +194,13 @@ class PriceCalculator:
                 result['total_price'] += glass_total
                 selected_material_types.append('glass')
 
-            # Подкладка (мин. MIN_BACKING_PRICE)
-            if backing_id:
-                backing = Backing.objects.get(pk=backing_id)
+            # Подкладка (одна или несколько; мин. MIN_BACKING_PRICE каждая)
+            bids = list(backing_ids) if backing_ids else ([backing_id] if backing_id else [])
+            if bids:
                 backing_area = PriceCalculator.calculate_glass_area(x1, x2)
-                backing_price = _floor(backing.price * backing_area, MIN_BACKING_PRICE)
-                result['components']['backing'] = {
-                    'name': backing.name,
-                    'area': float(backing_area),
-                    'unit_price': float(backing.price),
-                    'total_price': float(backing_price)
-                }
-                result['total_price'] += backing_price
+                comps, btotal = PriceCalculator.price_backings(bids, backing_area)
+                result['components'].update(comps)
+                result['total_price'] += btotal
                 selected_material_types.append('backing')
             
             # Фурнитура
@@ -453,8 +474,10 @@ class OrderExtrasCalculator:
         for i, _p in enumerate(pp_list[:3]):
             add_work(pp_types[i], base_max)
 
-        if data.get('backing_id'):
-            add_work('backing', base_max)
+        # Резка подкладки — по одной работе на каждую подкладку
+        bids_work = data.get('backing_ids') or ([data['backing_id']] if data.get('backing_id') else [])
+        for i, _b in enumerate([b for b in bids_work if b]):
+            add_work('backing' if i == 0 else 'backing2', base_max)
         if data.get('glass_id'):
             add_work('glass', base_max)
         if data.get('podramnik_id'):
@@ -539,10 +562,21 @@ class OrderExtrasCalculator:
                 'passepartout_width': order.passepartout_width,
             })
 
+        # Подкладки: список из frames_data (embedded), иначе одна из заказа
+        backings = []
+        if frames and isinstance(frames[0], dict):
+            embedded_b = frames[0].get('backings')
+            if isinstance(embedded_b, list):
+                backings = [(b.get('backing_id') if isinstance(b, dict) else b)
+                            for b in embedded_b if b]
+        if not backings and order.backing_id:
+            backings = [order.backing_id]
+
         data = {
             'baguette_id': order.baguette_id,
             'glass_id': order.glass_id,
             'backing_id': order.backing_id,
+            'backing_ids': backings,
             'hardware_id': order.hardware_id,
             'hardware_quantity': order.hardware_quantity,
             'podramnik_id': order.podramnik_id,
@@ -678,11 +712,14 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - total_glass_area
             )
 
-        # Подкладка (по площади)
-        if order_data.get('backing_id') and total_glass_area > 0:
-            Backing.objects.filter(pk=order_data['backing_id']).update(
-                stock_quantity=F('stock_quantity') - total_glass_area
-            )
+        # Подкладки (каждая по площади)
+        bids = order_data.get('backing_ids') or ([order_data['backing_id']] if order_data.get('backing_id') else [])
+        if total_glass_area > 0:
+            for bid in bids:
+                if bid:
+                    Backing.objects.filter(pk=bid).update(
+                        stock_quantity=F('stock_quantity') - total_glass_area
+                    )
 
         # Фурнитура
         if order_data.get('hardware_id'):

@@ -46,6 +46,18 @@ def format_number(value):
         return "—"
 
 
+def _order_backing_ids(order, frames):
+    """Список id подкладок из frames_data (несколько), иначе одна из заказа."""
+    ids = []
+    if frames and isinstance(frames[0], dict):
+        emb = frames[0].get('backings')
+        if isinstance(emb, list):
+            ids = [(b.get('backing_id') if isinstance(b, dict) else b) for b in emb if b]
+    if not ids and order.backing_id:
+        ids = [order.backing_id]
+    return ids
+
+
 def _scale_calc_by_copies(calculation, q):
     """Умножает расход/стоимость материалов на количество копий (для детализации)."""
     q = int(q or 1) or 1
@@ -330,6 +342,7 @@ def generate_receipt_word(order_id):
             x2=eff_x2,
             glass_id=None,
             backing_id=order.backing.id if order.backing else None,
+            backing_ids=_order_backing_ids(order, frames),
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -365,6 +378,7 @@ def generate_receipt_word(order_id):
             baguette_id=order.baguette.id if order.baguette else None,
             glass_id=order.glass.id if order.glass else None,
             backing_id=order.backing.id if order.backing else None,
+            backing_ids=_order_backing_ids(order, frames),
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -550,7 +564,20 @@ def generate_receipt_word(order_id):
                 for para in cell.paragraphs:
                     for run in para.runs:
                         run.font.size = Pt(8)
-    
+
+    # Дополнительные подкладки (backing_2, backing_3, ...)
+    for key in sorted(calculation.get('components', {}).keys()):
+        if key.startswith('backing_'):
+            component = calculation['components'][key]
+            row = details_table.add_row()
+            row.cells[2].text = "ПОДКЛАДКА:"
+            row.cells[3].text = component.get('name', '')
+            row.cells[6].text = f"{format_number(component.get('total_price', 0))} руб"
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        run.font.size = Pt(8)
+
     # Подытог по материалам (calculation['total_price'] = сумма материалов)
     materials_total = Decimal(str(calculation.get('total_price', 0)))
     _add_special_row('ИТОГО МАТЕРИАЛОВ:', price=materials_total)
@@ -695,6 +722,7 @@ def generate_receipt_html(order_id):
             x1=eff_x1, x2=eff_x2,
             glass_id=None,
             backing_id=order.backing.id if order.backing else None,
+            backing_ids=_order_backing_ids(order, frames),
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -728,6 +756,7 @@ def generate_receipt_html(order_id):
             baguette_id=order.baguette.id if order.baguette else None,
             glass_id=order.glass.id if order.glass else None,
             backing_id=order.backing.id if order.backing else None,
+            backing_ids=_order_backing_ids(order, frames),
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -820,6 +849,11 @@ def generate_receipt_html(order_id):
         if key.startswith('passepartout_frame'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'ПАСПАРТУ:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
+    # Дополнительные подкладки (backing_2, backing_3, ...)
+    for key in sorted(calculation.get('components', {}).keys()):
+        if key.startswith('backing_'):
+            c = calculation['components'][key]
+            detail_rows.append({'component': True, 'col2': 'ПОДКЛАДКА:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
     # Подытог по материалам и переход к разделу «Работы»
     materials_total = Decimal(str(calculation.get('total_price', 0)))
     detail_rows.append({'subtotal': True, 'col2': 'ИТОГО МАТЕРИАЛОВ:', 'col6': format_number(materials_total)})

@@ -60,7 +60,12 @@ export const Wizard = () => {
   const baguetteDropdownRef = useRef(null);
 
   const [glassId, setGlassId] = useState(orderData.glass_id || '');
-  const [backingId, setBackingId] = useState(orderData.backing_id || '');
+  // Подкладки — список (можно несколько): например ДВП + серый картон
+  const [selectedBackings, setSelectedBackings] = useState(
+    orderData.backings && orderData.backings.length
+      ? orderData.backings.map(String)
+      : (orderData.backing_id ? [String(orderData.backing_id)] : [])
+  );
   const [hardwareId, setHardwareId] = useState(orderData.hardware_id || '');
   const [hardwareQuantity, setHardwareQuantity] = useState(
     orderData.hardware_quantity || 1
@@ -258,8 +263,8 @@ export const Wizard = () => {
     if (orderData.glass_id && !glassId) {
       setGlassId(String(orderData.glass_id));
     }
-    if (orderData.backing_id && !backingId) {
-      setBackingId(String(orderData.backing_id));
+    if (orderData.backings && orderData.backings.length && selectedBackings.length === 0) {
+      setSelectedBackings(orderData.backings.map(String));
     }
     if (orderData.molding_id && !moldingId) {
       setMoldingId(String(orderData.molding_id));
@@ -522,12 +527,29 @@ export const Wizard = () => {
     updateOrderData({ passepartouts: newPps });
   };
 
+  // Подкладки (список): обновление выбора и синхронизация с orderData
+  const commitBackings = (list) => {
+    setSelectedBackings(list);
+    const ids = list.filter(Boolean).map((v) => parseInt(v));
+    updateOrderData({ backings: ids, backing_id: ids[0] || null });
+  };
+  const addBackingRow = () => commitBackings([...selectedBackings, '']);
+  const removeBackingRow = (index) =>
+    commitBackings(selectedBackings.filter((_, i) => i !== index));
+  const changeBackingRow = (index, value) => {
+    const next = [...selectedBackings];
+    next[index] = value;
+    commitBackings(next);
+  };
+
   // Шаг 2: Стекло, подкладка и подрамник вместе (всё опционально)
   const handleStep2Submit = (e) => {
     e.preventDefault();
+    const backingIds = selectedBackings.filter(Boolean).map((v) => parseInt(v));
     updateOrderData({
       glass_id: glassId ? parseInt(glassId) : null,
-      backing_id: backingId ? parseInt(backingId) : null,
+      backings: backingIds,
+      backing_id: backingIds[0] || null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
       stretch_id: stretchId ? parseInt(stretchId) : null,
     });
@@ -1225,37 +1247,48 @@ export const Wizard = () => {
                         </div>
                       </div>
 
-                      {/* Подкладка */}
+                      {/* Подкладки (можно несколько: например ДВП + серый картон) */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                          Подкладка{' '}
+                          Подкладки{' '}
                           <span className="text-sm font-normal text-gray-500">
-                            (опционально)
+                            (опционально, можно несколько)
                           </span>
                         </h3>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Выберите подкладку
-                          </label>
-                          <select
-                            value={backingId}
-                            onChange={(e) => {
-                              const newBackingId = e.target.value;
-                              setBackingId(newBackingId);
-                              // Сразу обновляем orderData для пересчета цены
-                              updateOrderData({
-                                backing_id: newBackingId ? parseInt(newBackingId) : null,
-                              });
-                            }}
-                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                        <div className="space-y-3">
+                          {selectedBackings.length === 0 && (
+                            <p className="text-sm text-gray-500">Подкладки не выбраны</p>
+                          )}
+                          {selectedBackings.map((val, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <select
+                                value={val}
+                                onChange={(e) => changeBackingRow(index, e.target.value)}
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              >
+                                <option value="">-- Выберите подкладку --</option>
+                                {backings.map((backing) => (
+                                  <option key={backing.id} value={backing.id}>
+                                    {backing.name} ({backing.price} ₽)
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => removeBackingRow(index)}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium px-2"
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={addBackingRow}
+                            className="wizard-button-add px-4 py-2 font-semibold"
                           >
-                            <option value="">-- Выберите подкладку --</option>
-                            {backings.map((backing) => (
-                              <option key={backing.id} value={backing.id}>
-                                {backing.name} ({backing.price} ₽)
-                              </option>
-                            ))}
-                          </select>
+                            + Добавить подкладку
+                          </button>
                         </div>
                       </div>
 

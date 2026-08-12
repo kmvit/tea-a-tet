@@ -22,6 +22,7 @@ export const OrderProvider = ({ children }) => {
     // Шаг 2: Стекло, подкладка и натяжка
     glass_id: null,
     backing_id: null,
+    backings: [],
     stretch_id: null,
     podramnik_id: null,
     // Шаг 3: Доп. опции (молдинг, тросик, подвески)
@@ -69,7 +70,8 @@ export const OrderProvider = ({ children }) => {
         x1: x1Val,
         x2: x2Val,
         glass_id: orderData.glass_id,
-        backing_id: orderData.backing_id,
+        backing_id: (orderData.backings && orderData.backings[0]) || orderData.backing_id || null,
+        backings: orderData.backings || [],
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,
@@ -122,6 +124,7 @@ export const OrderProvider = ({ children }) => {
       passepartouts: [],
       glass_id: null,
       backing_id: null,
+      backings: [],
       stretch_id: null,
       hardware_id: null,
       hardware_quantity: 1,

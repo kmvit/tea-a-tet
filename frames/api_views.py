@@ -16,6 +16,31 @@ from .services import (
 from orders.models import Order
 
 
+def _collect_backing_ids(data, frames):
+    """Собирает id подкладок (несколько) из запроса и/или сохранённых frames_data."""
+    ids = []
+
+    def _add(seq):
+        if isinstance(seq, list):
+            for b in seq:
+                bid = b.get('backing_id') if isinstance(b, dict) else b
+                if bid:
+                    ids.append(bid)
+
+    _add(data.get('backings'))
+    if frames and isinstance(frames[0], dict):
+        _add(frames[0].get('backings'))
+    if not ids and data.get('backing_id'):
+        ids.append(data.get('backing_id'))
+
+    seen, out = set(), []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
 def _collect_passepartouts(passepartouts_data, frames):
     """Собирает список паспарту из нового формата и legacy-данных рам."""
     items = []
@@ -261,7 +286,8 @@ def calculate_price_api(request):
         # Проверяем, есть ли массив рамок
         frames = data.get('frames', [])
         passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
-        
+        backing_ids = _collect_backing_ids(data, frames)
+
         if frames and len(frames) > 0:
             # Для нескольких рам — x1, x2 могут быть в каждой раме
             has_valid_sizes = x1 and x2 and x1 > 0 and x2 > 0
@@ -346,7 +372,7 @@ def calculate_price_api(request):
                 x1=eff_x1,
                 x2=eff_x2,
                 glass_id=None,
-                backing_id=data.get('backing_id'),
+                backing_id=None,
                 hardware_id=data.get('hardware_id'),
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
@@ -381,17 +407,11 @@ def calculate_price_api(request):
                 }
                 result['total_price'] += Decimal(str(glass_calc['total_price']))
 
-            # Подкладка — по суммарной площади всех рам
-            if data.get('backing_id') and total_glass_area > 0:
-                backing = Backing.objects.get(pk=data['backing_id'])
-                backing_price = _floor(total_glass_area * backing.price, MIN_BACKING_PRICE)
-                result['components']['backing'] = {
-                    'name': backing.name,
-                    'area': float(total_glass_area),
-                    'unit_price': float(backing.price),
-                    'total_price': float(backing_price),
-                }
-                result['total_price'] += Decimal(str(backing_price))
+            # Подкладки (несколько) — по суммарной площади всех рам
+            if backing_ids and total_glass_area > 0:
+                b_comps, b_total = PriceCalculator.price_backings(backing_ids, total_glass_area)
+                result['components'].update(b_comps)
+                result['total_price'] += b_total
 
             # Подрамник — как по раме, суммируем по всем рамам
             if data.get('podramnik_id') and frame_sizes:
@@ -429,6 +449,7 @@ def calculate_price_api(request):
                 baguette_id=data.get('baguette_id'),
                 glass_id=data.get('glass_id'),
                 backing_id=data.get('backing_id'),
+                backing_ids=backing_ids,
                 hardware_id=data.get('hardware_id'),
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
@@ -486,7 +507,8 @@ def create_order_api(request):
         # Проверяем наличие массив рамок
         frames = data.get('frames', [])
         passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
-        
+        backing_ids = _collect_backing_ids(data, frames)
+
         # Определяем данные для заказа
         # Если есть массив рамок, берем первую раму для сохранения в Order (модель поддерживает только одну раму)
         # Но рассчитываем цену для всех рамок
@@ -526,7 +548,8 @@ def create_order_api(request):
             'x2': Decimal(str(ord_x2 or 0)),
             'baguette_id': baguette_id,
             'glass_id': data.get('glass_id'),
-            'backing_id': data.get('backing_id'),
+            # В Order сохраняется первая подкладка (FK), полный список — в frames_data
+            'backing_id': backing_ids[0] if backing_ids else None,
         }
         
         # Подрамник опционально
@@ -623,7 +646,7 @@ def create_order_api(request):
                 x1=eff_x1,
                 x2=eff_x2,
                 glass_id=None,
-                backing_id=order_data.get('backing_id'),
+                backing_id=None,
                 hardware_id=order_data.get('hardware_id'),
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
@@ -640,9 +663,9 @@ def create_order_api(request):
                 if key not in ('glass', 'stretch', 'backing', 'podramnik'):
                     result['total_price'] += Decimal(str(value.get('total_price', 0)))
 
-            if order_data.get('backing_id') and total_glass_area > 0:
-                backing = Backing.objects.get(pk=order_data['backing_id'])
-                result['total_price'] += _floor(total_glass_area * backing.price, MIN_BACKING_PRICE)
+            if backing_ids and total_glass_area > 0:
+                _b_comps, _b_total = PriceCalculator.price_backings(backing_ids, total_glass_area)
+                result['total_price'] += _b_total
 
             if order_data.get('podramnik_id') and frame_sizes:
                 podramnik = Podramnik.objects.get(pk=order_data['podramnik_id'])
@@ -667,6 +690,7 @@ def create_order_api(request):
                 baguette_id=order_data.get('baguette_id'),
                 glass_id=order_data.get('glass_id'),
                 backing_id=order_data.get('backing_id'),
+                backing_ids=backing_ids,
                 hardware_id=order_data.get('hardware_id'),
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
@@ -722,13 +746,16 @@ def create_order_api(request):
             frames_to_save = [dict(frame) for frame in frames]
             if passepartouts:
                 frames_to_save[0]['passepartouts'] = passepartouts
+            if backing_ids:
+                frames_to_save[0]['backings'] = backing_ids
             order_data['frames_data'] = json.dumps(frames_to_save)
-        
+
         # Создаем заказ
         order = Order.objects.create(**order_data)
 
         # Списание материалов со склада
         deduct_data = dict(order_data)
+        deduct_data['backing_ids'] = backing_ids
         if data.get('stretch_id'):
             deduct_data['stretch_id'] = data['stretch_id']
         try:
@@ -789,7 +816,22 @@ def get_order_detail(request, order_id):
     """API для получения детальной информации о заказе с расчетами"""
     try:
         order = Order.objects.get(pk=order_id)
-        
+
+        # Список подкладок из frames_data (несколько), иначе одна из заказа
+        order_backing_ids = []
+        if order.frames_data:
+            try:
+                _sf = json.loads(order.frames_data)
+                if isinstance(_sf, list) and _sf and isinstance(_sf[0], dict):
+                    _emb = _sf[0].get('backings')
+                    if isinstance(_emb, list):
+                        order_backing_ids = [(b.get('backing_id') if isinstance(b, dict) else b)
+                                             for b in _emb if b]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not order_backing_ids and order.backing_id:
+            order_backing_ids = [order.backing_id]
+
         # Пересчитываем цену для получения детализации
         calculation = PriceCalculator.calculate_total_price(
             x1=order.x1,
@@ -797,6 +839,7 @@ def get_order_detail(request, order_id):
             baguette_id=order.baguette.id if order.baguette else None,
             glass_id=order.glass.id if order.glass else None,
             backing_id=order.backing.id if order.backing else None,
+            backing_ids=order_backing_ids,
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -962,6 +1005,7 @@ def get_order_detail(request, order_id):
                 x2=order.x2,
                 glass_id=order.glass.id if order.glass else None,
                 backing_id=order.backing.id if order.backing else None,
+                backing_ids=order_backing_ids,
                 hardware_id=order.hardware.id if order.hardware else None,
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -990,6 +1034,7 @@ def get_order_detail(request, order_id):
                 baguette_id=order.baguette.id if order.baguette else None,
                 glass_id=order.glass.id if order.glass else None,
                 backing_id=order.backing.id if order.backing else None,
+                backing_ids=order_backing_ids,
                 hardware_id=order.hardware.id if order.hardware else None,
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -1032,6 +1077,7 @@ def get_order_detail(request, order_id):
             'baguette_id': order.baguette_id,
             'glass_id': order.glass_id,
             'backing_id': order.backing_id,
+            'backing_ids': order_backing_ids,
             'hardware_id': order.hardware_id,
             'hardware_quantity': order.hardware_quantity,
             'podramnik_id': order.podramnik_id,
@@ -1063,6 +1109,11 @@ def get_order_detail(request, order_id):
                 'name': order.backing.name,
                 'price': float(order.backing.price),
             } if order.backing else None,
+            'backings': [
+                {'id': _bk.id, 'name': _bk.name, 'price': float(_bk.price)}
+                for _bk in (Backing.objects.filter(pk=_bid).first() for _bid in order_backing_ids)
+                if _bk
+            ],
             'stretch': {
                 'id': order.stretch.id,
                 'name': order.stretch.name,
