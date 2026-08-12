@@ -16,7 +16,7 @@ export const Header = () => {
           <Link to="/" className="site-logo">
             <span className="site-logo-mark" aria-hidden="true" />
             <span className="flex flex-col">
-              <span className="site-logo-title">Тет-а-Тет</span>
+              <span className="site-logo-title">РамкаОнлайн</span>
               <span className="site-logo-subtitle">Конструктор рам</span>
             </span>
           </Link>

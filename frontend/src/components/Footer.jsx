@@ -8,7 +8,7 @@ export const Footer = () => {
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-col items-center md:items-start">
-            <p className="site-footer-title">Тет-а-Тет</p>
+            <p className="site-footer-title">РамкаОнлайн</p>
             <p className="site-footer-text text-sm">
               &copy; {currentYear} Конструктор рам. Все права защищены.
             </p>
