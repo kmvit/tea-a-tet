@@ -474,9 +474,12 @@ class OrderExtrasCalculator:
         for i, _p in enumerate(pp_list[:3]):
             add_work(pp_types[i], base_max)
 
-        # Резка подкладки — по одной работе на каждую подкладку
-        bids_work = data.get('backing_ids') or ([data['backing_id']] if data.get('backing_id') else [])
-        for i, _b in enumerate([b for b in bids_work if b]):
+        # Резка подкладки — по одной работе на каждую подкладку.
+        # Список берём из любого доступного ключа (backing_ids/backings/backing_id).
+        bids_raw = (data.get('backing_ids') or data.get('backings')
+                    or ([data['backing_id']] if data.get('backing_id') else []))
+        bids_work = [(b.get('backing_id') if isinstance(b, dict) else b) for b in bids_raw if b]
+        for i, _b in enumerate(bids_work):
             add_work('backing' if i == 0 else 'backing2', base_max)
         if data.get('glass_id'):
             add_work('glass', base_max)
