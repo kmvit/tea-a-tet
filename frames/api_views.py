@@ -94,6 +94,7 @@ def get_baguettes(request):
             'barcode': baguette.barcode or '',
             'width': float(baguette.width),
             'price': float(baguette.price),
+            'stock_quantity': float(baguette.stock_quantity),
             'image': image_url,
         })
     return Response(data)
@@ -407,23 +408,24 @@ def calculate_price_api(request):
                 }
                 result['total_price'] += Decimal(str(glass_calc['total_price']))
 
-            # Подкладки (несколько) — по суммарной площади всех рам
-            if backing_ids and total_glass_area > 0:
-                b_comps, b_total = PriceCalculator.price_backings(backing_ids, total_glass_area)
+            # Подкладка/подрамник — «на картину», один раз по раме меньшего размера
+            pic_x1, pic_x2 = min(frame_sizes, key=lambda s: s[0] * s[1]) if frame_sizes else (x1, x2)
+            pic_area = PriceCalculator.calculate_glass_area(pic_x1, pic_x2)
+
+            # Подкладки (несколько) — по площади рамы меньшего размера
+            if backing_ids and pic_area > 0:
+                b_comps, b_total = PriceCalculator.price_backings(backing_ids, pic_area)
                 result['components'].update(b_comps)
                 result['total_price'] += b_total
 
-            # Подрамник — как по раме, суммируем по всем рамам
-            if data.get('podramnik_id') and frame_sizes:
+            # Подрамник — один раз по раме меньшего размера
+            if data.get('podramnik_id'):
                 podramnik = Podramnik.objects.get(pk=data['podramnik_id'])
-                total_podramnik_qty = sum(
-                    PriceCalculator.calculate_baguette_quantity(fx1, fx2, Decimal('0'))
-                    for fx1, fx2 in frame_sizes
-                )
-                podramnik_price = total_podramnik_qty * podramnik.price
+                podramnik_qty = PriceCalculator.calculate_baguette_quantity(pic_x1, pic_x2, Decimal('0'))
+                podramnik_price = podramnik_qty * podramnik.price
                 result['components']['podramnik'] = {
                     'name': podramnik.name,
-                    'quantity': float(total_podramnik_qty),
+                    'quantity': float(podramnik_qty),
                     'unit_price': float(podramnik.price),
                     'total_price': float(podramnik_price),
                 }
@@ -642,6 +644,9 @@ def create_order_api(request):
                 frame_sizes = [(x1, x2)]
             eff_x1, eff_x2 = frame_sizes[0]
             total_glass_area = sum(PriceCalculator.calculate_glass_area(fx1, fx2) for fx1, fx2 in frame_sizes)
+            # Подкладка/подрамник — «на картину», считаются один раз по раме меньшего размера
+            pic_x1, pic_x2 = min(frame_sizes, key=lambda s: s[0] * s[1])
+            pic_area = PriceCalculator.calculate_glass_area(pic_x1, pic_x2)
             other_calculation = PriceCalculator.calculate_total_price(
                 x1=eff_x1,
                 x2=eff_x2,
@@ -663,17 +668,14 @@ def create_order_api(request):
                 if key not in ('glass', 'stretch', 'backing', 'podramnik'):
                     result['total_price'] += Decimal(str(value.get('total_price', 0)))
 
-            if backing_ids and total_glass_area > 0:
-                _b_comps, _b_total = PriceCalculator.price_backings(backing_ids, total_glass_area)
+            if backing_ids and pic_area > 0:
+                _b_comps, _b_total = PriceCalculator.price_backings(backing_ids, pic_area)
                 result['total_price'] += _b_total
 
-            if order_data.get('podramnik_id') and frame_sizes:
+            if order_data.get('podramnik_id'):
                 podramnik = Podramnik.objects.get(pk=order_data['podramnik_id'])
-                total_podramnik_qty = sum(
-                    PriceCalculator.calculate_baguette_quantity(fx1, fx2, Decimal('0'))
-                    for fx1, fx2 in frame_sizes
-                )
-                result['total_price'] += total_podramnik_qty * podramnik.price
+                podramnik_qty = PriceCalculator.calculate_baguette_quantity(pic_x1, pic_x2, Decimal('0'))
+                result['total_price'] += podramnik_qty * podramnik.price
             if order_data.get('glass_id') and total_glass_area > 0:
                 from frames.models import Glass
                 glass = Glass.objects.get(pk=order_data['glass_id'])
@@ -902,8 +904,12 @@ def get_order_detail(request, order_id):
                             }
                         except Passepartout.DoesNotExist:
                             pass
-                    
-                    if frame:
+
+                    # Сохраняем собственные размеры рамы (для корректного расчёта каждой)
+                    frame['x1'] = frame_data.get('x1') or float(order.x1)
+                    frame['x2'] = frame_data.get('x2') or float(order.x2)
+
+                    if frame.get('baguette') or frame.get('passepartout'):
                         frames.append(frame)
             except (json.JSONDecodeError, KeyError) as e:
                 # Если не удалось распарсить, используем старую логику
@@ -912,6 +918,8 @@ def get_order_detail(request, order_id):
         # Если не удалось восстановить рамы из frames_data, используем старую логику (одна рама)
         if not frames and order.baguette:
             frame_from_order = {
+                'x1': float(order.x1),
+                'x2': float(order.x2),
                 'baguette': {
                     'id': order.baguette.id,
                     'name': order.baguette.name,
@@ -959,12 +967,14 @@ def get_order_detail(request, order_id):
                 'total_price': Decimal('0')
             }
             
-            # Рассчитываем цену для каждой рамы
+            # Рассчитываем цену для каждой рамы — по её собственному размеру
             for idx, frame in enumerate(frames):
                 if frame.get('baguette') and frame['baguette'].get('id'):
+                    f_x1 = Decimal(str(frame.get('x1') or order.x1))
+                    f_x2 = Decimal(str(frame.get('x2') or order.x2))
                     frame_calculation = PriceCalculator.calculate_total_price(
-                        x1=order.x1,
-                        x2=order.x2,
+                        x1=f_x1,
+                        x2=f_x2,
                         baguette_id=frame['baguette']['id'],
                         passepartout_id=frame.get('passepartout', {}).get('id'),
                         passepartout_length=Decimal(str(frame.get('passepartout', {}).get('length'))) if frame.get('passepartout', {}).get('length') else None,

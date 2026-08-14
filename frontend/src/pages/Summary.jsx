@@ -48,20 +48,20 @@ export const Summary = () => {
         quantity: orderData.quantity || 1,
       };
 
+      // Паспарту отправляем всегда — заказ может быть только на паспарту (без рамы)
+      dataToSend.passepartouts = orderData.passepartouts || [];
+
       if (orderData.frames && orderData.frames.length > 0) {
         dataToSend.frames = orderData.frames.map(frame => ({
           baguette_id: frame.baguette_id,
           x1: frame.x1,
           x2: frame.x2,
         }));
-        dataToSend.passepartouts = orderData.passepartouts || [];
-      } else {
-        if (orderData.baguette_id) {
-          dataToSend.baguette_id = orderData.baguette_id;
-          dataToSend.passepartout_id = orderData.passepartout_id;
-          dataToSend.passepartout_length = orderData.passepartout_length;
-          dataToSend.passepartout_width = orderData.passepartout_width;
-        }
+      } else if (orderData.baguette_id) {
+        dataToSend.baguette_id = orderData.baguette_id;
+        dataToSend.passepartout_id = orderData.passepartout_id;
+        dataToSend.passepartout_length = orderData.passepartout_length;
+        dataToSend.passepartout_width = orderData.passepartout_width;
       }
 
       const response = await createOrder(dataToSend);

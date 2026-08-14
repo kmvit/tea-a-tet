@@ -88,6 +88,9 @@ export const OrderProvider = ({ children }) => {
         quantity: orderData.quantity,
       };
       
+      // Паспарту отправляем всегда — заказ может быть только на паспарту (без рамы)
+      dataToSend.passepartouts = orderData.passepartouts || [];
+
       // Если есть массив рамок, отправляем его (с валидными размерами в каждой раме)
       if (orderData.frames && orderData.frames.length > 0) {
         dataToSend.frames = orderData.frames.map((f) => ({
@@ -95,15 +98,12 @@ export const OrderProvider = ({ children }) => {
           x1: f.x1 ?? x1Val,
           x2: f.x2 ?? x2Val,
         }));
-        dataToSend.passepartouts = orderData.passepartouts || [];
-      } else {
-        // Обратная совместимость: если нет массива, но есть старые поля
-        if (orderData.baguette_id) {
-          dataToSend.baguette_id = orderData.baguette_id;
-          dataToSend.passepartout_id = orderData.passepartout_id;
-          dataToSend.passepartout_length = orderData.passepartout_length;
-          dataToSend.passepartout_width = orderData.passepartout_width;
-        }
+      } else if (orderData.baguette_id) {
+        // Обратная совместимость: старые поля
+        dataToSend.baguette_id = orderData.baguette_id;
+        dataToSend.passepartout_id = orderData.passepartout_id;
+        dataToSend.passepartout_length = orderData.passepartout_length;
+        dataToSend.passepartout_width = orderData.passepartout_width;
       }
       
       const response = await calculatePrice(dataToSend);

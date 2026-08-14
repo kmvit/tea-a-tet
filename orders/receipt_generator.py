@@ -335,7 +335,8 @@ def generate_receipt_word(order_id):
                         calculation['total_price'] += Decimal(str(value.get('total_price', 0)))
         if not frame_sizes:
             frame_sizes = [(order.x1, order.x2)]
-        eff_x1, eff_x2 = frame_sizes[0]
+        # Подкладка/подрамник — по раме меньшего размера (на картину, один раз)
+        eff_x1, eff_x2 = min(frame_sizes, key=lambda s: s[0] * s[1])
         total_glass_area = sum(PriceCalculator.calculate_glass_area(fx1, fx2) for fx1, fx2 in frame_sizes)
         other_calc = PriceCalculator.calculate_total_price(
             x1=eff_x1,
@@ -716,7 +717,8 @@ def generate_receipt_html(order_id):
                         calculation['total_price'] += Decimal(str(value.get('total_price', 0)))
         if not frame_sizes:
             frame_sizes = [(order.x1, order.x2)]
-        eff_x1, eff_x2 = frame_sizes[0]
+        # Подкладка/подрамник — по раме меньшего размера (на картину, один раз)
+        eff_x1, eff_x2 = min(frame_sizes, key=lambda s: s[0] * s[1])
         total_glass_area = sum(PriceCalculator.calculate_glass_area(fx1, fx2) for fx1, fx2 in frame_sizes)
         other_calc = PriceCalculator.calculate_total_price(
             x1=eff_x1, x2=eff_x2,

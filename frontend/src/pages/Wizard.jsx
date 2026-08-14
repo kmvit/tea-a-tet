@@ -922,7 +922,18 @@ export const Wizard = () => {
                                             setErrors({ ...errors, frames: null });
                                           }}
                                         >
-                                          {baguette.name} {baguette.barcode && `(${baguette.barcode})`} — {baguette.price} ₽/м
+                                          <span>
+                                            {baguette.name} {baguette.barcode && `(${baguette.barcode})`} — {baguette.price} ₽/м
+                                          </span>
+                                          {baguette.stock_quantity != null && (
+                                            <span
+                                              className={`ml-2 text-sm font-medium ${
+                                                baguette.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'
+                                              }`}
+                                            >
+                                              (остаток: {baguette.stock_quantity} м)
+                                            </span>
+                                          )}
                                         </li>
                                       ))
                                     )}
