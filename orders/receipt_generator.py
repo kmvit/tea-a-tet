@@ -46,6 +46,41 @@ def format_number(value):
         return "—"
 
 
+def _add_independent_passepartouts(calculation, order, frames):
+    """Добавляет независимые паспарту (passepartout_1, ...) в расчёт квитанции.
+
+    Такие паспарту хранятся отдельным списком в frames_data и в цену заказа
+    входят, но раньше не выводились в квитанции. Возвращает добавленную сумму.
+    """
+    from frames.models import Passepartout
+    pps = []
+    if frames and isinstance(frames[0], dict):
+        emb = frames[0].get('passepartouts')
+        if isinstance(emb, list):
+            pps = [p for p in emb if isinstance(p, dict) and p.get('passepartout_id')]
+    added = Decimal('0')
+    for i, pp in enumerate(pps):
+        try:
+            obj = Passepartout.objects.get(pk=pp['passepartout_id'])
+        except Passepartout.DoesNotExist:
+            continue
+        length = Decimal(str(pp.get('passepartout_length'))) if pp.get('passepartout_length') else order.x1
+        width = Decimal(str(pp.get('passepartout_width'))) if pp.get('passepartout_width') else order.x2
+        area = PriceCalculator.calculate_glass_area(length, width)
+        price = area * obj.price
+        calculation['components'][f'passepartout_{i + 1}'] = {
+            'name': f'{obj.name} (Паспарту {i + 1})',
+            'length': float(length),
+            'width': float(width),
+            'area': float(area),
+            'unit_price': float(obj.price),
+            'total_price': float(price),
+        }
+        calculation['total_price'] += Decimal(str(price))
+        added += Decimal(str(price))
+    return added
+
+
 def _order_backing_ids(order, frames):
     """Список id подкладок из frames_data (несколько), иначе одна из заказа."""
     ids = []
@@ -370,6 +405,8 @@ def generate_receipt_word(order_id):
             }
             calculation['components']['glass'] = glass_calc
             calculation['total_price'] += Decimal(str(glass_calc['total_price']))
+        # Независимые паспарту (отдельный список) — входят в цену, выводим их строками
+        _add_independent_passepartouts(calculation, order, frames)
         # Натяжка — работа мастера (по периметру), выводится строкой «РАБОТА» из extras,
         # как материал по площади здесь не считается.
     else:
@@ -553,9 +590,9 @@ def generate_receipt_word(order_id):
                     for run in para.runs:
                         run.font.size = Pt(8)
     
-    # Паспарту по рамам (passepartout_frame1, passepartout_frame2, ...)
+    # Паспарту: по рамам (passepartout_frame*) и независимые (passepartout_1, ...)
     for key in sorted(calculation.get('components', {}).keys()):
-        if key.startswith('passepartout_frame'):
+        if key.startswith('passepartout_'):
             component = calculation['components'][key]
             row = details_table.add_row()
             row.cells[2].text = "ПАСПАРТУ:"
@@ -750,6 +787,8 @@ def generate_receipt_html(order_id):
                 'total_price': float(total_glass_area * glass.price_per_sqm)
             }
             calculation['total_price'] += Decimal(str(calculation['components']['glass']['total_price']))
+        # Независимые паспарту (отдельный список) — входят в цену, выводим их строками
+        _add_independent_passepartouts(calculation, order, frames)
         # Натяжка — работа мастера (по периметру), выводится строкой «РАБОТА» из extras,
         # как материал по площади здесь не считается.
     else:
@@ -848,7 +887,7 @@ def generate_receipt_html(order_id):
                 col4 = f"расход {c['quantity']} {unit}"
             detail_rows.append({'component': True, 'col2': label, 'col3': c.get('name', ''), 'col4': col4, 'col6': format_number(c.get('total_price', 0))})
     for key in sorted(calculation.get('components', {}).keys()):
-        if key.startswith('passepartout_frame'):
+        if key.startswith('passepartout_'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'ПАСПАРТУ:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
     # Дополнительные подкладки (backing_2, backing_3, ...)
