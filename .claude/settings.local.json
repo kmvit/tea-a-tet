@@ -5,7 +5,17 @@
       "Bash(npx eslint *)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(npm run *)",
-      "Read(//tmp/claude-501/-Users-home-PycharmProjects-tet-a-tet/2acac75a-6f06-4e45-9ead-6cfe71870979/scratchpad/**)"
+      "Read(//tmp/claude-501/-Users-home-PycharmProjects-tet-a-tet/2acac75a-6f06-4e45-9ead-6cfe71870979/scratchpad/**)",
+      "Read(//Users/home/PycharmProjects/**)",
+      "Read(//Users/home/PycharmProjects/frames/**)",
+      "Bash(perl -0pi -e 's/\\\\n\\\\s*work_id=order\\\\.work\\\\.id if order\\\\.work else None,//g' orders/receipt_generator.py)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git branch *)",
+      "Bash(grep -iA6 \"github\\\\|kmvit\\\\|tet\")",
+      "Bash(ssh -T git@github.com)",
+      "Bash(ssh -Tv git@github.com)"
     ]
   }
 }
