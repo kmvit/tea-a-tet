@@ -10,7 +10,7 @@ from .models import (
 class BaguetteAdmin(admin.ModelAdmin):
     list_display = ['name', 'width', 'price', 'stock_quantity', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['name']
+    search_fields = ['name', 'barcode']
     readonly_fields = ['created_at']
     
     fieldsets = (

@@ -70,19 +70,34 @@ def _collect_passepartouts(passepartouts_data, frames):
     return items
 
 
+# Похожие латинские/кириллические буквы приводим к одному виду,
+# чтобы «M59» находил «М59» (кириллица) и наоборот.
+_LOOKALIKE = str.maketrans({
+    'a': 'а', 'b': 'в', 'c': 'с', 'e': 'е', 'h': 'н', 'k': 'к', 'm': 'м',
+    'o': 'о', 'p': 'р', 't': 'т', 'x': 'х', 'y': 'у',
+})
+
+
+def _norm_search(s):
+    """Нормализация для поиска: без пробелов, в нижнем регистре, латиница→кириллица."""
+    return (s or '').replace(' ', '').lower().translate(_LOOKALIKE)
+
+
 @api_view(['GET'])
 def get_baguettes(request):
     """API для получения списка багетов с поддержкой поиска"""
     query = request.GET.get('search', '').strip()
-    
-    baguettes = Baguette.objects.all()
-    
-    # Поиск по названию или штрихкоду
+
+    baguettes = list(Baguette.objects.all())
+
+    # Поиск по названию или штрихкоду — без учёта пробелов, регистра и латиница/кириллица
     if query:
-        baguettes = baguettes.filter(
-            Q(name__icontains=query) | Q(barcode__icontains=query)
-        )
-    
+        q = _norm_search(query)
+        baguettes = [
+            b for b in baguettes
+            if q in _norm_search(b.name) or q in _norm_search(b.barcode or '')
+        ]
+
     data = []
     for baguette in baguettes:
         image_url = None

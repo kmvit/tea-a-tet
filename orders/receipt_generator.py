@@ -225,7 +225,7 @@ def generate_receipt_word(order_id):
     ip_info.add_run('картин, постеров, фотографий,\n').font.size = Pt(6)
     ip_info.add_run('гобеленов и вышивок.\n').font.size = Pt(6)
     ip_info.add_run('г.Пятигорск, ул.Дзержинского, д.49А\n').font.size = Pt(6)
-    ip_info.add_run('тел: 33-71-75\n').font.size = Pt(6)
+    ip_info.add_run('тел: 33-71-75, +7-962-41-30-631\n').font.size = Pt(6)
     ip_info.add_run('11:00 - 18:00. Выходной: понедельник.').font.size = Pt(6)
     
     # Убираем границы таблицы для более чистого вида
@@ -679,7 +679,19 @@ def generate_receipt_word(order_id):
     total_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     total_para.paragraph_format.space_before = Pt(3)
     total_para.paragraph_format.space_after = Pt(2)
-    
+
+    # Крупный номер заказа — приклеивается на обратную сторону рамы
+    num_label = doc.add_paragraph('Заказ №')
+    num_label.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    num_label.runs[0].font.size = Pt(11)
+    num_label.paragraph_format.space_before = Pt(18)
+    num_label.paragraph_format.space_after = Pt(0)
+    num_para = doc.add_paragraph(str(order.pk))
+    num_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    num_para.runs[0].font.bold = True
+    num_para.runs[0].font.size = Pt(96)
+    num_para.paragraph_format.space_before = Pt(0)
+
     # Комментарий к заказу (если есть)
     if order.comment and order.comment.strip():
         comment_para = doc.add_paragraph()
@@ -972,7 +984,7 @@ th {{ text-align: center; font-weight: bold; }}
 </td><td style="border:none;text-align:right;vertical-align:top" class="ip-info">
 ИП Караковский С.М.<br>ОГРН ИП:304263203300215<br>ИНН:263204326063<br>
 Профессиональное оформление<br>картин, постеров, фотографий,<br>гобеленов и вышивок.<br>
-г.Пятигорск, ул.Дзержинского, д.49А<br>тел: 33-71-75<br>11:00 - 18:00. Выходной: понедельник.
+г.Пятигорск, ул.Дзержинского, д.49А<br>тел: 33-71-75, +7-962-41-30-631<br>11:00 - 18:00. Выходной: понедельник.
 </td></tr></table>
 <div class="dashed">──────────────────────────────────────────────────<br>ОТРЫВНАЯ ЧАСТЬ<br>──────────────────────────────────────────────────</div>
 <table style="border:none"><tr><td style="border:none;vertical-align:top">
@@ -988,6 +1000,10 @@ th {{ text-align: center; font-weight: bold; }}
 </table>
 <p class="total">ИТОГО ПО ЗАКАЗУ: {format_number(order.total_price)} руб</p>
 {f'<p style="margin-top:10px;font-size:9pt"><b>Комментарий:</b> {esc(order.comment.strip())}</p>' if order.comment and order.comment.strip() else ''}
+<div style="margin-top:24px;text-align:center;border-top:2px solid #000;padding-top:8px">
+<div style="font-size:11pt">Заказ №</div>
+<div style="font-size:96pt;font-weight:bold;line-height:1">{order.pk}</div>
+</div>
 <script>window.onload=function(){{window.print();}}</script>
 </body>
 </html>'''
