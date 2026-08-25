@@ -1109,6 +1109,8 @@ def get_order_detail(request, order_id):
             'molding_id': order.molding_id,
             'package_id': order.package_id,
             'stretch_id': order.stretch_id,
+            'trosik_id': order.trosik_id,
+            'podveski_id': order.podveski_id,
             'manual_complexity': order.manual_complexity,
             'quantity': 1,
         }

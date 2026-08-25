@@ -312,6 +312,8 @@ class TechOperation(models.Model):
         ('glass2', 'Резка стекла2'),
         ('podramnik', 'Подрамник'),
         ('foamboard', 'Накатка на пенокартон'),
+        ('trosik_mount', 'Крепление тросика'),
+        ('podveski_mount', 'Крепление подвесок'),
         ('stretch', 'Натяжка холста'),
         ('molding', 'Молдинг'),
         ('complexity_frame', 'Сложность рамы'),

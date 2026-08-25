@@ -490,6 +490,14 @@ class OrderExtrasCalculator:
         if data.get('molding_id'):
             add_work('molding', 0)  # фиксированная расценка
 
+        # Крепления: работа мастера при выборе тросика/подвесок
+        # (обрезка и петли тросика; разметка и прикручивание колец).
+        # Расценка настраивается в тех-операциях; подбирается по размеру рамы.
+        if data.get('trosik_id'):
+            add_work('trosik_mount', base_max)
+        if data.get('podveski_id'):
+            add_work('podveski_mount', base_max)
+
         # Натяжка: работа мастера по периметру картины (по бортикам).
         # Расценка за метр берётся из справочника натяжек (у каждого материала своя),
         # материал приносит клиент — со склада ничего не списывается.
@@ -587,6 +595,8 @@ class OrderExtrasCalculator:
             'package_id': order.package_id,
             'package_quantity': order.package_quantity,
             'stretch_id': order.stretch_id,
+            'trosik_id': order.trosik_id,
+            'podveski_id': order.podveski_id,
             'manual_complexity': order.manual_complexity,
             'quantity': 1,
         }
