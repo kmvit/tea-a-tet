@@ -238,6 +238,7 @@ export const Wizard = () => {
     orderData.passepartouts,
     orderData.glass_id,
     orderData.backing_id,
+    orderData.backings,
     orderData.podramnik_id,
     orderData.hardware_id,
     orderData.hardware_quantity,
