@@ -135,6 +135,7 @@ class PriceCalculator:
         glass_id: Optional[int] = None,
         backing_id: Optional[int] = None,
         backing_ids: Optional[List[int]] = None,
+        foamboard_id: Optional[int] = None,
         hardware_id: Optional[int] = None,
         hardware_quantity: int = 1,
         podramnik_id: Optional[int] = None,
@@ -202,7 +203,21 @@ class PriceCalculator:
                 result['components'].update(comps)
                 result['total_price'] += btotal
                 selected_material_types.append('backing')
-            
+
+            # Пенокартон (накатка) — материал по площади (кв.м)
+            if foamboard_id:
+                foamboard = Foamboard.objects.get(pk=foamboard_id)
+                fb_area = PriceCalculator.calculate_glass_area(x1, x2)
+                fb_price = foamboard.price * fb_area
+                result['components']['foamboard'] = {
+                    'name': foamboard.name,
+                    'area': float(fb_area),
+                    'unit_price': float(foamboard.price),
+                    'total_price': float(fb_price),
+                }
+                result['total_price'] += fb_price
+                selected_material_types.append('foamboard')
+
             # Фурнитура
             if hardware_id:
                 hardware = Hardware.objects.get(pk=hardware_id)
@@ -485,8 +500,8 @@ class OrderExtrasCalculator:
             add_work('glass', base_max)
         if data.get('podramnik_id'):
             add_work('podramnik', base_max)
-        if data.get('foamboard_id'):
-            add_work('foamboard', base_max)
+        # Накатка на пенокартон — не отдельная работа, а материал по кв.м
+        # (лист пенокартона с клеевым слоем). Считается в calculate_total_price.
         if data.get('molding_id'):
             add_work('molding', 0)  # фиксированная расценка
 
@@ -733,6 +748,14 @@ class StockDeduction:
                     Backing.objects.filter(pk=bid).update(
                         stock_quantity=F('stock_quantity') - total_glass_area
                     )
+
+        # Пенокартон (накатка) — по площади картины (x1×x2)
+        if order_data.get('foamboard_id'):
+            fb_area = PriceCalculator.calculate_glass_area(x1, x2) * qmul
+            if fb_area > 0:
+                Foamboard.objects.filter(pk=order_data['foamboard_id']).update(
+                    stock_quantity=F('stock_quantity') - fb_area
+                )
 
         # Фурнитура
         if order_data.get('hardware_id'):

@@ -23,6 +23,7 @@ export const OrderProvider = ({ children }) => {
     glass_id: null,
     backing_id: null,
     backings: [],
+    foamboard_id: null,
     stretch_id: null,
     podramnik_id: null,
     // Шаг 3: Доп. опции (молдинг, тросик, подвески)
@@ -72,6 +73,7 @@ export const OrderProvider = ({ children }) => {
         glass_id: orderData.glass_id,
         backing_id: (orderData.backings && orderData.backings[0]) || orderData.backing_id || null,
         backings: orderData.backings || [],
+        foamboard_id: orderData.foamboard_id,
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,
@@ -125,6 +127,7 @@ export const OrderProvider = ({ children }) => {
       glass_id: null,
       backing_id: null,
       backings: [],
+      foamboard_id: null,
       stretch_id: null,
       hardware_id: null,
       hardware_quantity: 1,

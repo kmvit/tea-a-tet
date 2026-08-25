@@ -27,6 +27,7 @@ export const Summary = () => {
         glass_id: orderData.glass_id,
         backing_id: (orderData.backings && orderData.backings[0]) || orderData.backing_id || null,
         backings: orderData.backings || [],
+        foamboard_id: orderData.foamboard_id,
         stretch_id: orderData.stretch_id,
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,

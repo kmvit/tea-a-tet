@@ -13,6 +13,7 @@ import {
   getPodveski,
   getPassepartout,
   getStretches,
+  getFoamboards,
 } from '../api';
 import { ProgressBar } from '../components/ProgressBar';
 import { PricePanel } from '../components/PricePanel';
@@ -34,6 +35,7 @@ export const Wizard = () => {
   const [podveski, setPodveski] = useState([]);
   const [passepartout, setPassepartout] = useState([]);
   const [stretches, setStretches] = useState([]);
+  const [foamboards, setFoamboards] = useState([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -88,6 +90,7 @@ export const Wizard = () => {
     orderData.podveski_quantity || ''
   );
   const [stretchId, setStretchId] = useState(orderData.stretch_id || '');
+  const [foamboardId, setFoamboardId] = useState(orderData.foamboard_id || '');
   
   // Шаг 5: Данные клиента
   const [customerName, setCustomerName] = useState(orderData.customer_name || '');
@@ -137,6 +140,7 @@ export const Wizard = () => {
           podveskiRes,
           passepartoutRes,
           stretchesRes,
+          foamboardsRes,
         ] = await Promise.all([
           getBaguettes(),
           getGlasses(),
@@ -149,6 +153,7 @@ export const Wizard = () => {
           getPodveski(),
           getPassepartout(),
           getStretches(),
+          getFoamboards(),
         ]);
 
         setBaguettes(baguettesRes.data);
@@ -162,6 +167,7 @@ export const Wizard = () => {
         setPodveski(podveskiRes.data);
         setPassepartout(passepartoutRes.data);
         setStretches(stretchesRes.data);
+        setFoamboards(foamboardsRes.data);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
       } finally {
@@ -239,6 +245,7 @@ export const Wizard = () => {
     orderData.glass_id,
     orderData.backing_id,
     orderData.backings,
+    orderData.foamboard_id,
     orderData.podramnik_id,
     orderData.hardware_id,
     orderData.hardware_quantity,
@@ -551,6 +558,7 @@ export const Wizard = () => {
       glass_id: glassId ? parseInt(glassId) : null,
       backings: backingIds,
       backing_id: backingIds[0] || null,
+      foamboard_id: foamboardId ? parseInt(foamboardId) : null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
       stretch_id: stretchId ? parseInt(stretchId) : null,
     });
@@ -1301,6 +1309,37 @@ export const Wizard = () => {
                           >
                             + Добавить подкладку
                           </button>
+                        </div>
+                      </div>
+
+                      {/* Пенокартон (накатка) — материал по кв.м */}
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                          Накатка на пенокартон{' '}
+                          <span className="text-sm font-normal text-gray-500">
+                            (опционально)
+                          </span>
+                        </h3>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Выберите пенокартон
+                          </label>
+                          <select
+                            value={foamboardId}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setFoamboardId(v);
+                              updateOrderData({ foamboard_id: v ? parseInt(v) : null });
+                            }}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                          >
+                            <option value="">-- Не выбрано --</option>
+                            {foamboards.map((fb) => (
+                              <option key={fb.id} value={fb.id}>
+                                {fb.name} ({fb.price} ₽/кв.м)
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 

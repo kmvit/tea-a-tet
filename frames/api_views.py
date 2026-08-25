@@ -389,6 +389,7 @@ def calculate_price_api(request):
                 x2=eff_x2,
                 glass_id=None,
                 backing_id=None,
+                foamboard_id=data.get('foamboard_id'),
                 hardware_id=data.get('hardware_id'),
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
@@ -467,6 +468,7 @@ def calculate_price_api(request):
                 glass_id=data.get('glass_id'),
                 backing_id=data.get('backing_id'),
                 backing_ids=backing_ids,
+                foamboard_id=data.get('foamboard_id'),
                 hardware_id=data.get('hardware_id'),
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
@@ -569,6 +571,10 @@ def create_order_api(request):
             'backing_id': backing_ids[0] if backing_ids else None,
         }
         
+        # Пенокартон (накатка) опционально
+        if data.get('foamboard_id'):
+            order_data['foamboard_id'] = data.get('foamboard_id')
+
         # Подрамник опционально
         if data.get('podramnik_id'):
             order_data['podramnik_id'] = data.get('podramnik_id')
@@ -667,6 +673,7 @@ def create_order_api(request):
                 x2=eff_x2,
                 glass_id=None,
                 backing_id=None,
+                foamboard_id=order_data.get('foamboard_id'),
                 hardware_id=order_data.get('hardware_id'),
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
@@ -708,6 +715,7 @@ def create_order_api(request):
                 glass_id=order_data.get('glass_id'),
                 backing_id=order_data.get('backing_id'),
                 backing_ids=backing_ids,
+                foamboard_id=order_data.get('foamboard_id'),
                 hardware_id=order_data.get('hardware_id'),
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
@@ -857,6 +865,7 @@ def get_order_detail(request, order_id):
             glass_id=order.glass.id if order.glass else None,
             backing_id=order.backing.id if order.backing else None,
             backing_ids=order_backing_ids,
+            foamboard_id=order.foamboard_id,
             hardware_id=order.hardware.id if order.hardware else None,
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -1031,6 +1040,7 @@ def get_order_detail(request, order_id):
                 glass_id=order.glass.id if order.glass else None,
                 backing_id=order.backing.id if order.backing else None,
                 backing_ids=order_backing_ids,
+                foamboard_id=order.foamboard_id,
                 hardware_id=order.hardware.id if order.hardware else None,
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -1060,6 +1070,7 @@ def get_order_detail(request, order_id):
                 glass_id=order.glass.id if order.glass else None,
                 backing_id=order.backing.id if order.backing else None,
                 backing_ids=order_backing_ids,
+                foamboard_id=order.foamboard_id,
                 hardware_id=order.hardware.id if order.hardware else None,
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
@@ -1141,6 +1152,11 @@ def get_order_detail(request, order_id):
                 for _bk in (Backing.objects.filter(pk=_bid).first() for _bid in order_backing_ids)
                 if _bk
             ],
+            'foamboard': {
+                'id': order.foamboard.id,
+                'name': order.foamboard.name,
+                'price': float(order.foamboard.price),
+            } if order.foamboard else None,
             'stretch': {
                 'id': order.stretch.id,
                 'name': order.stretch.name,
