@@ -680,17 +680,16 @@ def generate_receipt_word(order_id):
     total_para.paragraph_format.space_before = Pt(3)
     total_para.paragraph_format.space_after = Pt(2)
 
-    # Крупный номер заказа — приклеивается на обратную сторону рамы
-    num_label = doc.add_paragraph('Заказ №')
-    num_label.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    num_label.runs[0].font.size = Pt(11)
-    num_label.paragraph_format.space_before = Pt(18)
-    num_label.paragraph_format.space_after = Pt(0)
-    num_para = doc.add_paragraph(str(order.pk))
-    num_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    num_para.runs[0].font.bold = True
-    num_para.runs[0].font.size = Pt(96)
-    num_para.paragraph_format.space_before = Pt(0)
+    # Номер заказа — сбоку, некрупно (удобно вырезать и клеить на раму)
+    num_para = doc.add_paragraph()
+    num_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    lbl = num_para.add_run('Заказ № ')
+    lbl.font.size = Pt(10)
+    num = num_para.add_run(str(order.pk))
+    num.font.bold = True
+    num.font.size = Pt(40)
+    num_para.paragraph_format.space_before = Pt(10)
+    num_para.paragraph_format.space_after = Pt(0)
 
     # Комментарий к заказу (если есть)
     if order.comment and order.comment.strip():
@@ -1000,9 +999,9 @@ th {{ text-align: center; font-weight: bold; }}
 </table>
 <p class="total">ИТОГО ПО ЗАКАЗУ: {format_number(order.total_price)} руб</p>
 {f'<p style="margin-top:10px;font-size:9pt"><b>Комментарий:</b> {esc(order.comment.strip())}</p>' if order.comment and order.comment.strip() else ''}
-<div style="margin-top:24px;text-align:center;border-top:2px solid #000;padding-top:8px">
-<div style="font-size:11pt">Заказ №</div>
-<div style="font-size:96pt;font-weight:bold;line-height:1">{order.pk}</div>
+<div style="margin-top:14px;text-align:left">
+<span style="font-size:10pt">Заказ №</span>
+<span style="font-size:40pt;font-weight:bold;line-height:1">{order.pk}</span>
 </div>
 <script>window.onload=function(){{window.print();}}</script>
 </body>
