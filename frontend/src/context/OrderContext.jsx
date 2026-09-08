@@ -26,6 +26,7 @@ export const OrderProvider = ({ children }) => {
     foamboard_id: null,
     stretch_id: null,
     podramnik_id: null,
+    podramnik_bridges: null,
     // Шаг 3: Доп. опции (молдинг, тросик, подвески)
     molding_id: null,
     molding_consumption: null,
@@ -77,6 +78,7 @@ export const OrderProvider = ({ children }) => {
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,
+        podramnik_bridges: orderData.podramnik_bridges,
         package_id: orderData.package_id,
         package_quantity: orderData.package_quantity,
         molding_id: orderData.molding_id,
@@ -129,6 +131,7 @@ export const OrderProvider = ({ children }) => {
       backings: [],
       foamboard_id: null,
       stretch_id: null,
+      podramnik_bridges: null,
       hardware_id: null,
       hardware_quantity: 1,
       podramnik_id: null,

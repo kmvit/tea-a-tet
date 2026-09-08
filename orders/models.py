@@ -108,7 +108,16 @@ class Order(models.Model):
         blank=True,
         null=True
     )
-    
+    podramnik_bridges = models.DecimalField(
+        'Перемычки подрамника (м)',
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Метраж рейки на перемычки (по длине, по ширине, усиление углов). '
+                  'Стоимость = метраж × цена выбранной рейки.'
+    )
+
     package = models.ForeignKey(
         Package,
         on_delete=models.PROTECT,

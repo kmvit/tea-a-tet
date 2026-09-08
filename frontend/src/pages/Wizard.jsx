@@ -91,6 +91,9 @@ export const Wizard = () => {
   );
   const [stretchId, setStretchId] = useState(orderData.stretch_id || '');
   const [foamboardId, setFoamboardId] = useState(orderData.foamboard_id || '');
+  const [podramnikBridges, setPodramnikBridges] = useState(
+    orderData.podramnik_bridges != null ? String(orderData.podramnik_bridges) : ''
+  );
   
   // Шаг 5: Данные клиента
   const [customerName, setCustomerName] = useState(orderData.customer_name || '');
@@ -247,6 +250,7 @@ export const Wizard = () => {
     orderData.backings,
     orderData.foamboard_id,
     orderData.podramnik_id,
+    orderData.podramnik_bridges,
     orderData.hardware_id,
     orderData.hardware_quantity,
     orderData.package_id,
@@ -560,6 +564,7 @@ export const Wizard = () => {
       backing_id: backingIds[0] || null,
       foamboard_id: foamboardId ? parseInt(foamboardId) : null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
+      podramnik_bridges: podramnikId && podramnikBridges ? parseFloat(podramnikBridges) : null,
       stretch_id: stretchId ? parseInt(stretchId) : null,
     });
     setCurrentStep(3);
@@ -1375,6 +1380,33 @@ export const Wizard = () => {
                             ))}
                           </select>
                         </div>
+
+                        {podramnikId && (
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Перемычки (м)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={podramnikBridges}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setPodramnikBridges(v);
+                                updateOrderData({
+                                  podramnik_bridges: v ? parseFloat(v) : null,
+                                });
+                              }}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              placeholder="Метраж рейки на перемычки"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                              Метраж рейки на перемычки (по длине, по ширине, усиление углов).
+                              Стоимость = метраж × цена выбранной рейки, отдельной строкой.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Натяжка */}

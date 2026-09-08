@@ -139,6 +139,7 @@ class PriceCalculator:
         hardware_id: Optional[int] = None,
         hardware_quantity: int = 1,
         podramnik_id: Optional[int] = None,
+        podramnik_bridges: Optional[Decimal] = None,
         package_id: Optional[int] = None,
         package_quantity: int = 1,
         molding_id: Optional[int] = None,
@@ -244,6 +245,19 @@ class PriceCalculator:
                 }
                 result['total_price'] += podramnik_price
                 selected_material_types.append('podramnik')
+
+                # Перемычки подрамника — метраж вводится вручную (по длине,
+                # по ширине, усиление углов), цена та же, что у выбранной рейки
+                bridges_m = _dec(podramnik_bridges)
+                if bridges_m > 0:
+                    bridges_price = podramnik.price * bridges_m
+                    result['components']['podramnik_bridges'] = {
+                        'name': f'Перемычки ({podramnik.name})',
+                        'quantity': float(bridges_m),
+                        'unit_price': float(podramnik.price),
+                        'total_price': float(bridges_price),
+                    }
+                    result['total_price'] += bridges_price
             
             # Упаковка (цена × количество упаковки)
             if package_id:
@@ -778,6 +792,8 @@ class StockDeduction:
                     total_podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
             else:
                 total_podramnik_qty = PriceCalculator.calculate_baguette_quantity(x1, x2, Decimal('0'))
+            # Перемычки — дополнительный метраж той же рейки
+            total_podramnik_qty += _dec(order_data.get('podramnik_bridges'))
             Podramnik.objects.filter(pk=order_data['podramnik_id']).update(
                 stock_quantity=F('stock_quantity') - total_podramnik_qty * qmul
             )
