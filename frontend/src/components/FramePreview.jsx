@@ -168,7 +168,8 @@ export const FramePreview = ({ showLabel = true }) => {
       orderData.baguette_id;
     if (!hasBaguetteOrPp) return;
     const { x1, x2 } = getPaintingDimensions();
-    const aspectRatio = x1 / x2;
+    // x1 — высота, x2 — ширина. Пропорция холста = ширина / высота
+    const aspectRatio = x2 / x1;
     const totalLayersFw = layers.length > 0
       ? layers.reduce((acc, l) => acc + (l.type === 'passepartout' ? Math.min(l.width, 30) : DEFAULT_FRAME_WIDTH), 0)
       : DEFAULT_FRAME_WIDTH * 2;

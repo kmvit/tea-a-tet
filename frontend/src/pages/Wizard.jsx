@@ -303,12 +303,16 @@ export const Wizard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderData, passepartoutsData.length]);
 
-  // Автоматическая установка длины тросика равной ширине картины (x2)
+  // Длина тросика = ширина картины + 20% (на провисание и петли с двух сторон)
+  const TROSIK_SLACK = 1.2;
+  const trosikAutoLength = x2 && parseFloat(x2) > 0
+    ? round2(parseFloat(x2) * TROSIK_SLACK)
+    : '';
   useEffect(() => {
-    if (trosikId && x2) {
-      setTrosikLength(x2);
+    if (trosikId && trosikAutoLength) {
+      setTrosikLength(String(trosikAutoLength));
     }
-  }, [trosikId, x2]);
+  }, [trosikId, trosikAutoLength]);
 
   // Авто-размеры Рам 2/3: внутренний размер рамы = внешний размер предыдущей рамы
   // (размер предыдущей рамы + 2 × ширина её багета). Пересчитывается, пока мастер
@@ -388,10 +392,10 @@ export const Wizard = () => {
     if (frames.length === 0) {
       // Рам нет — проверяем размер картины
       if (!x1 || parseFloat(x1) <= 0) {
-        newErrors.x1 = 'Введите корректный размер X1';
+        newErrors.x1 = 'Введите корректную высоту';
       }
       if (!x2 || parseFloat(x2) <= 0) {
-        newErrors.x2 = 'Введите корректный размер X2';
+        newErrors.x2 = 'Введите корректную ширину';
       }
     } else {
       // У каждой рамы должны быть заданы свои размеры
@@ -399,8 +403,8 @@ export const Wizard = () => {
         const f = frames[i];
         const vx1 = parseFloat(f.x1);
         const vx2 = parseFloat(f.x2);
-        if (!f.x1 || !vx1 || vx1 <= 0) newErrors[`frame_${i}_x1`] = `Рама ${i + 1}: введите размер X1`;
-        if (!f.x2 || !vx2 || vx2 <= 0) newErrors[`frame_${i}_x2`] = `Рама ${i + 1}: введите размер X2`;
+        if (!f.x1 || !vx1 || vx1 <= 0) newErrors[`frame_${i}_x1`] = `Рама ${i + 1}: введите высоту`;
+        if (!f.x2 || !vx2 || vx2 <= 0) newErrors[`frame_${i}_x2`] = `Рама ${i + 1}: введите ширину`;
       }
     }
 
@@ -579,7 +583,7 @@ export const Wizard = () => {
     if (trosikId) {
       updates.trosik_id = parseInt(trosikId);
       // Длина тросика в БД хранится в метрах, в интерфейсе вводим/показываем см.
-      updates.trosik_length = parseFloat(trosikLength || x2 || 0) / 100;
+      updates.trosik_length = parseFloat(trosikLength || trosikAutoLength || 0) / 100;
     } else {
       updates.trosik_id = null;
       updates.trosik_length = null;
@@ -720,7 +724,7 @@ export const Wizard = () => {
                           <div className="space-y-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Размер X1 (см)
+                                Высота (см)
                               </label>
                               <input
                                 type="number"
@@ -738,7 +742,7 @@ export const Wizard = () => {
                                 className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                   errors.x1 ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
                                 }`}
-                                placeholder="Введите размер X1"
+                                placeholder="Введите высоту"
                               />
                               {errors.x1 && (
                                 <p className="mt-1 text-sm text-red-600">{errors.x1}</p>
@@ -746,7 +750,7 @@ export const Wizard = () => {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Размер X2 (см)
+                                Ширина (см)
                               </label>
                               <input
                                 type="number"
@@ -764,7 +768,7 @@ export const Wizard = () => {
                                 className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                   errors.x2 ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
                                 }`}
-                                placeholder="Введите размер X2"
+                                placeholder="Введите ширину"
                               />
                               {errors.x2 && (
                                 <p className="mt-1 text-sm text-red-600">{errors.x2}</p>
@@ -801,7 +805,7 @@ export const Wizard = () => {
                               <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Размер X1 (см)
+                                  Высота (см)
                                 </label>
                                 <input
                                   type="number"
@@ -821,7 +825,7 @@ export const Wizard = () => {
                                       ? 'border-red-500'
                                       : 'border-gray-300 focus:border-blue-500'
                                   }`}
-                                  placeholder="X1"
+                                  placeholder="Высота"
                                 />
                                 {errors[`frame_${frameIndex}_x1`] && (
                                   <p className="mt-1 text-sm text-red-600">
@@ -831,7 +835,7 @@ export const Wizard = () => {
                               </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Размер X2 (см)
+                                  Ширина (см)
                                 </label>
                                 <input
                                   type="number"
@@ -851,7 +855,7 @@ export const Wizard = () => {
                                       ? 'border-red-500'
                                       : 'border-gray-300 focus:border-blue-500'
                                   }`}
-                                  placeholder="X2"
+                                  placeholder="Ширина"
                                 />
                                 {errors[`frame_${frameIndex}_x2`] && (
                                   <p className="mt-1 text-sm text-red-600">
@@ -1497,7 +1501,7 @@ export const Wizard = () => {
                                 // Сразу обновляем orderData для пересчета цены
                                 updateOrderData({
                                   trosik_id: newTrosikId ? parseInt(newTrosikId) : null,
-                                  trosik_length: newTrosikId ? parseFloat(trosikLength || x2 || 0) / 100 : null,
+                                  trosik_length: newTrosikId ? parseFloat(trosikLength || trosikAutoLength || 0) / 100 : null,
                                 });
                               }}
                               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
@@ -1513,20 +1517,20 @@ export const Wizard = () => {
                           {trosikId && (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Длина тросика (см) <span className="text-gray-500 text-xs">(равна ширине картины)</span>
+                                Длина тросика (см) <span className="text-gray-500 text-xs">(ширина картины + 20%)</span>
                               </label>
                               <input
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={trosikLength || x2 || ''}
+                                value={trosikLength || trosikAutoLength || ''}
                                 onChange={(e) => setTrosikLength(e.target.value)}
                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition bg-gray-50"
-                                placeholder={x2 ? `Ширина картины: ${x2} см` : 'Введите ширину картины'}
+                                placeholder={x2 ? `Ширина ${x2} см + 20%` : 'Укажите ширину картины'}
                                 readOnly
                               />
                               <p className="mt-1 text-xs text-gray-500">
-                                Длина тросика автоматически равна ширине картины ({x2 || 'не указана'} см)
+                                Ширина картины ({x2 || 'не указана'} см) + 20% на провисание и петли = {trosikAutoLength || '—'} см
                               </p>
                             </div>
                           )}

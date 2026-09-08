@@ -140,7 +140,7 @@ export const Summary = () => {
                   </div>
                 ) : (
                   <p className="text-gray-600">
-                    X1: {orderData.x1} см × X2: {orderData.x2} см
+                    Высота: {orderData.x1} см × Ширина: {orderData.x2} см
                   </p>
                 )}
               </div>
