@@ -13,7 +13,7 @@ function App() {
       <BrowserRouter>
         <div className="h-full flex flex-col">
           <Header />
-          <main className="flex-1 overflow-y-auto pt-8">
+          <main className="flex-1 overflow-y-auto pt-3">
             <Routes>
               <Route path="/" element={<Wizard />} />
               <Route path="/summary" element={<Summary />} />

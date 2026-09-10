@@ -712,9 +712,9 @@ export const Wizard = () => {
   }
 
   return (
-    <div className="wizard-page py-8">
+    <div className="wizard-page py-3">
       <div className="container mx-auto px-4">
-        <div className="py-[50px]">
+        <div className="py-4">
           <ProgressBar currentStep={currentStep} onStepClick={goToStep} />
         </div>
 
@@ -1235,7 +1235,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-end">
                       <button
                         type="submit"
                         className="wizard-button-primary px-8 py-3 font-semibold"
@@ -1457,7 +1457,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-between pt-4">
+                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(1)}
@@ -1581,7 +1581,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-between pt-4">
+                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(2)}
@@ -1715,7 +1715,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-between pt-4">
+                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(3)}
@@ -1835,7 +1835,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-between pt-4">
+                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(4)}
