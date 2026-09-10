@@ -414,6 +414,7 @@ def calculate_price_api(request):
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
                 podramnik2_id=data.get('podramnik2_id'),
+                podramnik_bridges=data.get('podramnik_bridges'),
                 package_id=data.get('package_id'),
                 package_ids=package_ids,
                 molding_id=data.get('molding_id'),
@@ -496,6 +497,7 @@ def calculate_price_api(request):
                 hardware_quantity=data.get('hardware_quantity', 1),
                 podramnik_id=data.get('podramnik_id'),
                 podramnik2_id=data.get('podramnik2_id'),
+                podramnik_bridges=data.get('podramnik_bridges'),
                 package_id=data.get('package_id'),
                 package_ids=package_ids,
                 molding_id=data.get('molding_id'),
@@ -605,6 +607,8 @@ def create_order_api(request):
             order_data['podramnik_id'] = data.get('podramnik_id')
         if data.get('podramnik2_id'):
             order_data['podramnik2_id'] = data.get('podramnik2_id')
+            if data.get('podramnik_bridges'):
+                order_data['podramnik_bridges'] = Decimal(str(data.get('podramnik_bridges')))
         
         # Паспарту опционально
         if passepartout_id:
@@ -705,6 +709,7 @@ def create_order_api(request):
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
                 podramnik2_id=order_data.get('podramnik2_id'),
+                podramnik_bridges=order_data.get('podramnik_bridges'),
                 package_id=order_data.get('package_id'),
                 package_ids=package_ids,
                 molding_id=order_data.get('molding_id'),
@@ -749,6 +754,7 @@ def create_order_api(request):
                 hardware_quantity=order_data.get('hardware_quantity', 1),
                 podramnik_id=order_data.get('podramnik_id'),
                 podramnik2_id=order_data.get('podramnik2_id'),
+                podramnik_bridges=order_data.get('podramnik_bridges'),
                 package_id=order_data.get('package_id'),
                 package_ids=package_ids,
                 molding_id=order_data.get('molding_id'),
@@ -901,6 +907,7 @@ def get_order_detail(request, order_id):
             hardware_quantity=order.hardware_quantity or 1,
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik2_id=order.podramnik2_id,
+            podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
             package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
@@ -1077,6 +1084,7 @@ def get_order_detail(request, order_id):
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 podramnik2_id=order.podramnik2_id,
+                podramnik_bridges=order.podramnik_bridges,
                 package_id=order.package.id if order.package else None,
                 package_ids=order.get_package_ids(),
                 molding_id=order.molding.id if order.molding else None,
@@ -1108,6 +1116,7 @@ def get_order_detail(request, order_id):
                 hardware_quantity=order.hardware_quantity or 1,
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 podramnik2_id=order.podramnik2_id,
+                podramnik_bridges=order.podramnik_bridges,
                 package_id=order.package.id if order.package else None,
                 package_ids=order.get_package_ids(),
                 molding_id=order.molding.id if order.molding else None,
@@ -1206,6 +1215,7 @@ def get_order_detail(request, order_id):
                 'name': order.podramnik2.name,
                 'price': float(order.podramnik2.price),
             } if order.podramnik2 else None,
+            'podramnik_bridges': float(order.podramnik_bridges) if order.podramnik_bridges else 0,
             'hardware': {
                 'id': order.hardware.id,
                 'name': order.hardware.name,

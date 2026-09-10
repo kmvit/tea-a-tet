@@ -140,6 +140,7 @@ class PriceCalculator:
         hardware_quantity: int = 1,
         podramnik_id: Optional[int] = None,
         podramnik2_id: Optional[int] = None,
+        podramnik_bridges: Optional[Decimal] = None,
         package_id: Optional[int] = None,
         package_ids: Optional[List[int]] = None,
         package_quantity: int = 1,
@@ -255,13 +256,17 @@ class PriceCalculator:
             if podramnik2_id:
                 bridges = Podramnik.objects.filter(pk=podramnik2_id).first()
                 if bridges:
+                    meters = _dec(podramnik_bridges)
+                    if meters <= 0:
+                        meters = Decimal('1')
+                    bridges_total = bridges.price * meters
                     result['components']['podramnik_bridges'] = {
                         'name': bridges.name,
-                        'quantity': 1,
+                        'quantity': float(meters),
                         'unit_price': float(bridges.price),
-                        'total_price': float(bridges.price),
+                        'total_price': float(bridges_total),
                     }
-                    result['total_price'] += bridges.price
+                    result['total_price'] += bridges_total
 
             # Упаковка: в заказе может быть несколько разных упаковок
             pkg_ids = list(package_ids) if package_ids else ([package_id] if package_id else [])
@@ -632,6 +637,7 @@ class OrderExtrasCalculator:
             'hardware_quantity': order.hardware_quantity,
             'podramnik_id': order.podramnik_id,
             'podramnik2_id': order.podramnik2_id,
+            'podramnik_bridges': order.podramnik_bridges,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
             'package_ids': order.get_package_ids(),
@@ -808,10 +814,13 @@ class StockDeduction:
                 stock_quantity=F('stock_quantity') - total_podramnik_qty * qmul
             )
 
-        # Перемычки — отдельная позиция справочника, 1 шт на копию
+        # Перемычки — отдельная позиция справочника, списываем метраж
         if order_data.get('podramnik2_id'):
+            _bm = _dec(order_data.get('podramnik_bridges'))
+            if _bm <= 0:
+                _bm = Decimal('1')
             Podramnik.objects.filter(pk=order_data['podramnik2_id']).update(
-                stock_quantity=F('stock_quantity') - qmul
+                stock_quantity=F('stock_quantity') - _bm * qmul
             )
 
         # Упаковка (количество упаковки × копии)

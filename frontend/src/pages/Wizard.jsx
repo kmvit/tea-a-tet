@@ -97,6 +97,9 @@ export const Wizard = () => {
   const [foamboardId, setFoamboardId] = useState(orderData.foamboard_id || '');
   // Перемычки — вторая позиция из справочника подрамников
   const [podramnik2Id, setPodramnik2Id] = useState(orderData.podramnik2_id || '');
+  const [podramnikBridges, setPodramnikBridges] = useState(
+    orderData.podramnik_bridges != null ? String(orderData.podramnik_bridges) : ''
+  );
   
   // Шаг 5: Данные клиента
   const [customerName, setCustomerName] = useState(orderData.customer_name || '');
@@ -254,6 +257,7 @@ export const Wizard = () => {
     orderData.foamboard_id,
     orderData.podramnik_id,
     orderData.podramnik2_id,
+    orderData.podramnik_bridges,
     orderData.hardware_id,
     orderData.hardware_quantity,
     orderData.package_id,
@@ -588,6 +592,7 @@ export const Wizard = () => {
       foamboard_id: foamboardId ? parseInt(foamboardId) : null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
       podramnik2_id: podramnik2Id ? parseInt(podramnik2Id) : null,
+      podramnik_bridges: podramnik2Id && podramnikBridges ? parseFloat(podramnikBridges) : null,
       stretch_id: stretchId ? parseInt(stretchId) : null,
     });
     setCurrentStep(3);
@@ -1235,7 +1240,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-end">
+                    <div className="flex justify-end">
                       <button
                         type="submit"
                         className="wizard-button-primary px-8 py-3 font-semibold"
@@ -1420,6 +1425,27 @@ export const Wizard = () => {
                             ))}
                           </select>
                         </div>
+
+                        {podramnik2Id && (
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Метры
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={podramnikBridges}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setPodramnikBridges(v);
+                                updateOrderData({ podramnik_bridges: v ? parseFloat(v) : null });
+                              }}
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              placeholder="Например 0.2"
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {/* Натяжка */}
@@ -1457,7 +1483,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
+                    <div className="flex justify-between pt-4">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(1)}
@@ -1581,7 +1607,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
+                    <div className="flex justify-between pt-4">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(2)}
@@ -1715,7 +1741,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
+                    <div className="flex justify-between pt-4">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(3)}
@@ -1835,7 +1861,7 @@ export const Wizard = () => {
                       </div>
                     </div>
 
-                    <div className="sticky bottom-0 z-10 bg-white border-t border-gray-200 -mx-8 px-8 py-3 mt-4 flex justify-between">
+                    <div className="flex justify-between pt-4">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(4)}

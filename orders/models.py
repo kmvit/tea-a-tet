@@ -118,12 +118,12 @@ class Order(models.Model):
         help_text='Вторая позиция подрамника (перемычки). Считается по цене записи, фиксированно.'
     )
     podramnik_bridges = models.DecimalField(
-        'Перемычки подрамника (м) — не используется',
+        'Перемычки: метры',
         max_digits=8,
         decimal_places=2,
         blank=True,
         null=True,
-        help_text='Устаревшее: раньше вводился метраж. Теперь перемычки выбираются из справочника.'
+        help_text='Метраж перемычек. Стоимость = цена выбранной записи × метры.'
     )
 
     package = models.ForeignKey(
