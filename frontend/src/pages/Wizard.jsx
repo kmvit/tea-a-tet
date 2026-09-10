@@ -712,32 +712,32 @@ export const Wizard = () => {
   }
 
   return (
-    <div className="wizard-page py-4">
+    <div className="wizard-page py-8">
       <div className="container mx-auto px-4">
-        <div className="py-6">
+        <div className="py-[50px]">
           <ProgressBar currentStep={currentStep} onStepClick={goToStep} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="wizard-card p-6">
+            <div className="wizard-card p-8">
               {/* Шаг 1: Размеры, паспарту и багет */}
               {currentStep === 1 && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6">
                     📏 Шаг 1: Рама, паспарту и молдинг
                   </h2>
                   <form onSubmit={handleStep1Submit} className="space-y-6">
                     <div className="space-y-6">
                       {/* Размер картины — пока рама не добавлена (после добавления размер задаётся в Раме 1) */}
                       {frames.length === 0 && (
-                        <div className="wizard-section p-4">
-                          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                        <div className="wizard-section p-6">
+                          <h3 className="text-xl font-semibold text-gray-800 mb-4">
                             Размер картины
                           </h3>
                           <div className="space-y-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Высота (см)
                               </label>
                               <input
@@ -753,7 +753,7 @@ export const Wizard = () => {
                                     updateOrderData({ x1: parseFloat(newX1) });
                                   }
                                 }}
-                                className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                   errors.x1 ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
                                 }`}
                                 placeholder="Введите высоту"
@@ -763,7 +763,7 @@ export const Wizard = () => {
                               )}
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Ширина (см)
                               </label>
                               <input
@@ -779,7 +779,7 @@ export const Wizard = () => {
                                     updateOrderData({ x2: parseFloat(newX2) });
                                   }
                                 }}
-                                className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                   errors.x2 ? 'border-red-500' : 'border-gray-300 focus:border-blue-500'
                                 }`}
                                 placeholder="Введите ширину"
@@ -818,7 +818,7 @@ export const Wizard = () => {
                               )}
                               <div className="grid grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Высота (см)
                                 </label>
                                 <input
@@ -834,7 +834,7 @@ export const Wizard = () => {
                                     setFrameSizeManualFlag(frameIndex, 'x1', v !== '');
                                     setErrors({ ...errors, [`frame_${frameIndex}_x1`]: null });
                                   }}
-                                  className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                                  className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                     errors[`frame_${frameIndex}_x1`]
                                       ? 'border-red-500'
                                       : 'border-gray-300 focus:border-blue-500'
@@ -848,7 +848,7 @@ export const Wizard = () => {
                                 )}
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
                                   Ширина (см)
                                 </label>
                                 <input
@@ -864,7 +864,7 @@ export const Wizard = () => {
                                     setFrameSizeManualFlag(frameIndex, 'x2', v !== '');
                                     setErrors({ ...errors, [`frame_${frameIndex}_x2`]: null });
                                   }}
-                                  className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                                  className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                                     errors[`frame_${frameIndex}_x2`]
                                       ? 'border-red-500'
                                       : 'border-gray-300 focus:border-blue-500'
@@ -884,7 +884,7 @@ export const Wizard = () => {
                           <div className="space-y-6">
                             {/* Багет — объединённый поиск и выбор */}
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Поиск и выбор багета
                               </label>
                               <div
@@ -925,7 +925,7 @@ export const Wizard = () => {
                                     setOpenBaguetteDropdownFrame(frameIndex);
                                     fetchBaguettesImmediate(baguetteSearches[frameIndex] || '');
                                   }}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                   placeholder="Введите название или штрихкод багета"
                                   autoComplete="off"
                                 />
@@ -992,8 +992,8 @@ export const Wizard = () => {
                       )}
 
                       {/* Паспарту (независимо от количества рам) */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Паспарту{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (до 3, опционально)
@@ -1027,7 +1027,7 @@ export const Wizard = () => {
                                       passepartout_image: pp?.image || null,
                                     });
                                   }}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                 >
                                   <option value="">-- Не выбрано --</option>
                                   {passepartout.map((pp) => (
@@ -1043,7 +1043,7 @@ export const Wizard = () => {
 
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                       Внешняя длина (см)
                                     </label>
                                     <input
@@ -1058,13 +1058,13 @@ export const Wizard = () => {
                                         });
                                         setPpOuterManualFlag(ppIndex, 'len', newLength !== '');
                                       }}
-                                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                       placeholder="авто = размер картины"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                       Внешняя ширина (см)
                                     </label>
                                     <input
@@ -1079,7 +1079,7 @@ export const Wizard = () => {
                                         });
                                         setPpOuterManualFlag(ppIndex, 'wid', newWidth !== '');
                                       }}
-                                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                       placeholder="авто = размер картины"
                                     />
                                   </div>
@@ -1087,7 +1087,7 @@ export const Wizard = () => {
 
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                       Окно: длина (см)
                                     </label>
                                     <input
@@ -1101,13 +1101,13 @@ export const Wizard = () => {
                                           window_length: v && parseFloat(v) > 0 ? parseFloat(v) : null,
                                         });
                                       }}
-                                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                       placeholder="Длина окна"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
                                       Окно: ширина (см)
                                     </label>
                                     <input
@@ -1121,7 +1121,7 @@ export const Wizard = () => {
                                           window_width: v && parseFloat(v) > 0 ? parseFloat(v) : null,
                                         });
                                       }}
-                                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                       placeholder="Ширина окна"
                                     />
                                   </div>
@@ -1143,8 +1143,8 @@ export const Wizard = () => {
                       </div>
 
                       {/* Молдинг — после рамы и паспарту */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Молдинг{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
@@ -1152,7 +1152,7 @@ export const Wizard = () => {
                         </h3>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                               Выберите молдинг
                             </label>
                             <select
@@ -1165,7 +1165,7 @@ export const Wizard = () => {
                                   molding_consumption: newMoldingId && moldingConsumption ? parseFloat(moldingConsumption) : null,
                                 });
                               }}
-                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                             >
                               <option value="">-- Не выбрано --</option>
                               {moldings.map((molding) => (
@@ -1177,7 +1177,7 @@ export const Wizard = () => {
                           </div>
                           {moldingId && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Расход молдинга (м)
                               </label>
                               <input
@@ -1193,7 +1193,7 @@ export const Wizard = () => {
                                     molding_consumption: newConsumption ? parseFloat(newConsumption) : null,
                                   });
                                 }}
-                                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                                 placeholder="авто = периметр окна паспарту"
                               />
                               <p className="mt-1 text-xs text-gray-500">
@@ -1250,22 +1250,22 @@ export const Wizard = () => {
               {/* Шаг 2: Стекло, подкладка и подрамник */}
               {currentStep === 2 && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6">
                     🔍 Шаг 2: Выберите стекло, подкладку и подрамник
                   </h2>
 
                   <form onSubmit={handleStep2Submit} className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="space-y-6">
                       {/* Стекло */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Стекло{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
                           </span>
                         </h3>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Выберите стекло
                           </label>
                           <select
@@ -1278,7 +1278,7 @@ export const Wizard = () => {
                                 glass_id: newGlassId ? parseInt(newGlassId) : null,
                               });
                             }}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           >
                             <option value="">-- Выберите стекло --</option>
                             {glasses.map((glass) => (
@@ -1291,8 +1291,8 @@ export const Wizard = () => {
                       </div>
 
                       {/* Подкладки (можно несколько: например ДВП + серый картон) */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Подкладки{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально, можно несколько)
@@ -1307,7 +1307,7 @@ export const Wizard = () => {
                               <select
                                 value={val}
                                 onChange={(e) => changeBackingRow(index, e.target.value)}
-                                className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                               >
                                 <option value="">-- Выберите подкладку --</option>
                                 {backings.map((backing) => (
@@ -1336,15 +1336,15 @@ export const Wizard = () => {
                       </div>
 
                       {/* Пенокартон (накатка) — материал по кв.м */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Накатка на пенокартон{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
                           </span>
                         </h3>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Выберите пенокартон
                           </label>
                           <select
@@ -1354,7 +1354,7 @@ export const Wizard = () => {
                               setFoamboardId(v);
                               updateOrderData({ foamboard_id: v ? parseInt(v) : null });
                             }}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           >
                             <option value="">-- Не выбрано --</option>
                             {foamboards.map((fb) => (
@@ -1367,15 +1367,15 @@ export const Wizard = () => {
                       </div>
 
                       {/* Подрамник */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Подрамник{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
                           </span>
                         </h3>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Выберите подрамник
                           </label>
                           <select
@@ -1388,7 +1388,7 @@ export const Wizard = () => {
                                 podramnik_id: newPodramnikId ? parseInt(newPodramnikId) : null,
                               });
                             }}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           >
                             <option value="">-- Выберите подрамник --</option>
                             {podramniki.map((podramnik) => (
@@ -1400,7 +1400,7 @@ export const Wizard = () => {
                         </div>
 
                         <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Перемычки
                           </label>
                           <select
@@ -1410,7 +1410,7 @@ export const Wizard = () => {
                               setPodramnik2Id(v);
                               updateOrderData({ podramnik2_id: v ? parseInt(v) : null });
                             }}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           >
                             <option value="">-- Не выбрано --</option>
                             {podramniki.map((p) => (
@@ -1423,15 +1423,15 @@ export const Wizard = () => {
                       </div>
 
                       {/* Натяжка */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Натяжка{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
                           </span>
                         </h3>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Выберите натяжку
                           </label>
                           <select
@@ -1444,7 +1444,7 @@ export const Wizard = () => {
                                 stretch_id: newStretchId ? parseInt(newStretchId) : null,
                               });
                             }}
-                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           >
                             <option value="">-- Выберите натяжку --</option>
                             {stretches.map((stretch) => (
@@ -1479,7 +1479,7 @@ export const Wizard = () => {
               {/* Шаг 3: Дополнительные опции */}
               {currentStep === 3 && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6">
                     ✨ Шаг 3: Дополнительные опции (опционально)
                   </h2>
 
@@ -1491,15 +1491,15 @@ export const Wizard = () => {
                   </div>
 
                   <form onSubmit={handleStep3Submit} className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="space-y-6">
                       {/* Тросик */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Тросик
                         </h3>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                               Выберите тросик
                             </label>
                             <select
@@ -1513,7 +1513,7 @@ export const Wizard = () => {
                                   trosik_length: newTrosikId ? parseFloat(trosikLength || trosikAutoLength || 0) / 100 : null,
                                 });
                               }}
-                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                             >
                               <option value="">-- Не выбрано --</option>
                               {trosiki.map((trosik) => (
@@ -1525,7 +1525,7 @@ export const Wizard = () => {
                           </div>
                           {trosikId && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Длина тросика (см) <span className="text-gray-500 text-xs">(ширина картины + 20%)</span>
                               </label>
                               <input
@@ -1534,7 +1534,7 @@ export const Wizard = () => {
                                 min="0"
                                 value={trosikLength || trosikAutoLength || ''}
                                 onChange={(e) => setTrosikLength(e.target.value)}
-                                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition bg-gray-50"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition bg-gray-50"
                                 placeholder={x2 ? `Ширина ${x2} см + 20%` : 'Укажите ширину картины'}
                                 readOnly
                               />
@@ -1547,13 +1547,13 @@ export const Wizard = () => {
                       </div>
 
                       {/* Подвески */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Подвески
                         </h3>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                               Выберите подвески
                             </label>
                             <select
@@ -1567,7 +1567,7 @@ export const Wizard = () => {
                                   podveski_quantity: newPodveskiId ? 1 : null,
                                 });
                               }}
-                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                             >
                               <option value="">-- Не выбрано --</option>
                               {podveski.map((podveska) => (
@@ -1603,15 +1603,15 @@ export const Wizard = () => {
               {/* Шаг 4: Фурнитура и упаковка */}
               {currentStep === 4 && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6">
                     🔧 Шаг 4: Выберите фурнитуру и упаковку
                   </h2>
 
                   <form onSubmit={handleStep4Submit} className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="space-y-6">
                       {/* Фурнитура */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Фурнитура{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально)
@@ -1619,7 +1619,7 @@ export const Wizard = () => {
                         </h3>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                               Выберите фурнитуру
                             </label>
                             <select
@@ -1633,7 +1633,7 @@ export const Wizard = () => {
                                   hardware_quantity: newHardwareId ? hardwareQuantity : 1,
                                 });
                               }}
-                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                             >
                               <option value="">-- Не выбрано --</option>
                               {hardware.map((hw) => (
@@ -1645,7 +1645,7 @@ export const Wizard = () => {
                           </div>
                           {hardwareId && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Количество фурнитуры
                               </label>
                               <input
@@ -1662,7 +1662,7 @@ export const Wizard = () => {
                                     });
                                   }
                                 }}
-                                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                               />
                             </div>
                           )}
@@ -1670,8 +1670,8 @@ export const Wizard = () => {
                       </div>
 
                       {/* Упаковки (можно несколько разных) */}
-                      <div className="wizard-section p-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                      <div className="wizard-section p-6">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Упаковка{' '}
                           <span className="text-sm font-normal text-gray-500">
                             (опционально, можно несколько)
@@ -1686,7 +1686,7 @@ export const Wizard = () => {
                               <select
                                 value={val}
                                 onChange={(e) => changePackageRow(index, e.target.value)}
-                                className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                               >
                                 <option value="">-- Выберите упаковку --</option>
                                 {packages.map((pkg) => (
@@ -1737,14 +1737,14 @@ export const Wizard = () => {
               {/* Шаг 5: Данные клиента */}
               {currentStep === 5 && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6">
                     👤 Шаг 5: Данные клиента
                   </h2>
                   <form onSubmit={handleStep5Submit} className="space-y-6">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="space-y-6">
                       {/* Имя клиента */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Имя клиента <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1754,7 +1754,7 @@ export const Wizard = () => {
                             setCustomerName(e.target.value);
                             setErrors({ ...errors, customer_name: null });
                           }}
-                          className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                             errors.customer_name
                               ? 'border-red-500'
                               : 'border-gray-300 focus:border-blue-500'
@@ -1769,7 +1769,7 @@ export const Wizard = () => {
 
                       {/* Телефон клиента */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Телефон клиента <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -1779,7 +1779,7 @@ export const Wizard = () => {
                             setCustomerPhone(e.target.value);
                             setErrors({ ...errors, customer_phone: null });
                           }}
-                          className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
+                          className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition ${
                             errors.customer_phone
                               ? 'border-red-500'
                               : 'border-gray-300 focus:border-blue-500'
@@ -1794,13 +1794,13 @@ export const Wizard = () => {
 
                       {/* Способ оплаты */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Способ оплаты
                         </label>
                         <select
                           value={paymentMethod}
                           onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                         >
                           <option value="наличные">Наличные</option>
                           <option value="карта">Банковская карта</option>
@@ -1810,7 +1810,7 @@ export const Wizard = () => {
 
                       {/* Аванс */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Аванс (руб) <span className="text-gray-500 text-xs">(опционально)</span>
                         </label>
                         <input
@@ -1819,7 +1819,7 @@ export const Wizard = () => {
                           min="0"
                           value={advancePayment}
                           onChange={(e) => setAdvancePayment(e.target.value)}
-                          className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           placeholder="0.00"
                         />
                         {priceCalculation?.total_price && (
