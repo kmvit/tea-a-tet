@@ -141,6 +141,7 @@ class PriceCalculator:
         podramnik_id: Optional[int] = None,
         podramnik_bridges: Optional[Decimal] = None,
         package_id: Optional[int] = None,
+        package_ids: Optional[List[int]] = None,
         package_quantity: int = 1,
         molding_id: Optional[int] = None,
         molding_consumption: Optional[Decimal] = None,
@@ -260,17 +261,20 @@ class PriceCalculator:
                     result['total_price'] += bridges_price
             
             # Упаковка (цена × количество упаковки)
-            if package_id:
-                package = Package.objects.get(pk=package_id)
-                pkg_qty = int(package_quantity or 1) or 1
-                package_total = package.price * pkg_qty
-                result['components']['package'] = {
+            # Упаковка: в заказе может быть несколько разных упаковок
+            pkg_ids = list(package_ids) if package_ids else ([package_id] if package_id else [])
+            for idx, pid in enumerate([p for p in pkg_ids if p]):
+                package = Package.objects.filter(pk=pid).first()
+                if not package:
+                    continue
+                key = 'package' if idx == 0 else f'package_{idx + 1}'
+                result['components'][key] = {
                     'name': package.name,
-                    'quantity': pkg_qty,
+                    'quantity': 1,
                     'unit_price': float(package.price),
-                    'total_price': float(package_total)
+                    'total_price': float(package.price),
                 }
-                result['total_price'] += package_total
+                result['total_price'] += package.price
             
             # Опциональные компоненты
             
@@ -542,10 +546,15 @@ class OrderExtrasCalculator:
 
         # Упаковка: расценка = Окр(цена_упаковки / 2). Количество упаковки на эту
         # работу не влияет — оно умножает только стоимость самих пакетов (материал).
-        if data.get('package_id'):
-            package = Package.objects.filter(pk=data['package_id']).first()
+        # Упаковка: на каждую упаковку своя работа = Окр(цена упаковки / 2)
+        pkg_ids_work = (data.get('package_ids') or data.get('packages')
+                        or ([data['package_id']] if data.get('package_id') else []))
+        pkg_ids_work = [(p.get('package_id') if isinstance(p, dict) else p) for p in pkg_ids_work if p]
+        for pid in [p for p in pkg_ids_work if p]:
+            package = Package.objects.filter(pk=pid).first()
             if package:
-                add_work('package', 0, label='Упаковка', rate_override=_okr(package.price / 2))
+                add_work('package', 0, label=f'Упаковка ({package.name})',
+                         rate_override=_okr(package.price / 2))
 
         # Авто-сложность отключена: сложность задаётся вручную полем manual_complexity
         # на заказе. (Расчёт compR/compP/compMount выше сохранён на случай возврата.)
@@ -622,7 +631,7 @@ class OrderExtrasCalculator:
             'podramnik_id': order.podramnik_id,
             'molding_id': order.molding_id,
             'package_id': order.package_id,
-            'package_quantity': order.package_quantity,
+            'package_ids': order.get_package_ids(),
             'stretch_id': order.stretch_id,
             'trosik_id': order.trosik_id,
             'podveski_id': order.podveski_id,
@@ -799,10 +808,11 @@ class StockDeduction:
             )
 
         # Упаковка (количество упаковки × копии)
-        if order_data.get('package_id'):
-            pkg_qty = int(order_data.get('package_quantity') or 1) or 1
-            Package.objects.filter(pk=order_data['package_id']).update(
-                stock_quantity=F('stock_quantity') - pkg_qty * qmul
+        pkg_ids_stock = (order_data.get('package_ids')
+                         or ([order_data['package_id']] if order_data.get('package_id') else []))
+        for _pid in [p for p in pkg_ids_stock if p]:
+            Package.objects.filter(pk=_pid).update(
+                stock_quantity=F('stock_quantity') - qmul
             )
 
         # Паспарту

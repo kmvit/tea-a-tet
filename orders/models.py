@@ -126,7 +126,14 @@ class Order(models.Model):
         blank=True,
         null=True
     )
-    package_quantity = models.PositiveIntegerField('Количество упаковки', default=1, blank=True, null=True)
+    package_quantity = models.PositiveIntegerField(
+        'Количество упаковки', default=1, blank=True, null=True,
+        help_text='Не используется: упаковок может быть несколько, список в packages_data.'
+    )
+    packages_data = models.TextField(
+        'Упаковки (список)', blank=True, null=True,
+        help_text='JSON-список id упаковок заказа. В поле «Упаковка» хранится первая (совместимость).'
+    )
 
     # Дополнительные компоненты (опциональные)
     molding = models.ForeignKey(
@@ -210,6 +217,19 @@ class Order(models.Model):
     def __str__(self):
         return f"Заказ #{self.pk} от {self.created_at.strftime('%d.%m.%Y')} ({self.get_status_display()})"
     
+    def get_package_ids(self):
+        """Список id упаковок заказа (packages_data), иначе одна из поля package."""
+        if self.packages_data:
+            try:
+                ids = json.loads(self.packages_data)
+                if isinstance(ids, list):
+                    out = [(i.get('package_id') if isinstance(i, dict) else i) for i in ids if i]
+                    if out:
+                        return out
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return [self.package_id] if self.package_id else []
+
     def get_baguette_quantity(self):
         """Расчет количества багета: (X1 + X2) * 2 + 8 * W"""
         if not self.baguette:

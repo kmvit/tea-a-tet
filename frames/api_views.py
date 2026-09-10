@@ -41,6 +41,25 @@ def _collect_backing_ids(data, frames):
     return out
 
 
+def _collect_package_ids(data):
+    """Собирает id упаковок (несколько) из запроса: packages[] или package_id."""
+    ids = []
+    seq = data.get('packages')
+    if isinstance(seq, list):
+        for p in seq:
+            pid = p.get('package_id') if isinstance(p, dict) else p
+            if pid:
+                ids.append(pid)
+    if not ids and data.get('package_id'):
+        ids.append(data.get('package_id'))
+    out, seen = [], set()
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
 def _collect_passepartouts(passepartouts_data, frames):
     """Собирает список паспарту из нового формата и legacy-данных рам."""
     items = []
@@ -303,6 +322,7 @@ def calculate_price_api(request):
         frames = data.get('frames', [])
         passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
         backing_ids = _collect_backing_ids(data, frames)
+        package_ids = _collect_package_ids(data)
 
         if frames and len(frames) > 0:
             # Для нескольких рам — x1, x2 могут быть в каждой раме
@@ -395,7 +415,7 @@ def calculate_price_api(request):
                 podramnik_id=data.get('podramnik_id'),
                 podramnik_bridges=data.get('podramnik_bridges'),
                 package_id=data.get('package_id'),
-                package_quantity=data.get('package_quantity', 1),
+                package_ids=package_ids,
                 molding_id=data.get('molding_id'),
                 molding_consumption=Decimal(str(data.get('molding_consumption'))) if data.get('molding_consumption') else None,
                 trosik_id=data.get('trosik_id'),
@@ -487,7 +507,7 @@ def calculate_price_api(request):
                 podramnik_id=data.get('podramnik_id'),
                 podramnik_bridges=data.get('podramnik_bridges'),
                 package_id=data.get('package_id'),
-                package_quantity=data.get('package_quantity', 1),
+                package_ids=package_ids,
                 molding_id=data.get('molding_id'),
                 molding_consumption=Decimal(str(data.get('molding_consumption'))) if data.get('molding_consumption') else None,
                 trosik_id=data.get('trosik_id'),
@@ -541,6 +561,7 @@ def create_order_api(request):
         frames = data.get('frames', [])
         passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
         backing_ids = _collect_backing_ids(data, frames)
+        package_ids = _collect_package_ids(data)
 
         # Определяем данные для заказа
         # Если есть массив рамок, берем первую раму для сохранения в Order (модель поддерживает только одну раму)
@@ -608,12 +629,12 @@ def create_order_api(request):
             order_data['hardware_id'] = data.get('hardware_id')
             order_data['hardware_quantity'] = data.get('hardware_quantity', 1)
         
-        # Упаковка опциональна; количество упаковки привязано к её выбору
-        if data.get('package_id'):
-            order_data['package_id'] = data.get('package_id')
-            order_data['package_quantity'] = int(data.get('package_quantity', 1) or 1)
-        else:
-            order_data['package_quantity'] = 1
+        # Упаковки: в заказе может быть несколько разных упаковок.
+        # В поле package хранится первая (совместимость), полный список — в packages_data.
+        if package_ids:
+            order_data['package_id'] = package_ids[0]
+            order_data['packages_data'] = json.dumps(package_ids)
+        order_data['package_quantity'] = 1
 
         # Натяжка опциональна
         if data.get('stretch_id'):
@@ -695,7 +716,7 @@ def create_order_api(request):
                 podramnik_id=order_data.get('podramnik_id'),
                 podramnik_bridges=order_data.get('podramnik_bridges'),
                 package_id=order_data.get('package_id'),
-                package_quantity=order_data.get('package_quantity', 1),
+                package_ids=package_ids,
                 molding_id=order_data.get('molding_id'),
                 molding_consumption=order_data.get('molding_consumption'),
                 trosik_id=order_data.get('trosik_id'),
@@ -741,7 +762,7 @@ def create_order_api(request):
                 podramnik_id=order_data.get('podramnik_id'),
                 podramnik_bridges=order_data.get('podramnik_bridges'),
                 package_id=order_data.get('package_id'),
-                package_quantity=order_data.get('package_quantity', 1),
+                package_ids=package_ids,
                 molding_id=order_data.get('molding_id'),
                 molding_consumption=order_data.get('molding_consumption'),
                 trosik_id=order_data.get('trosik_id'),
@@ -802,6 +823,7 @@ def create_order_api(request):
         # Списание материалов со склада
         deduct_data = dict(order_data)
         deduct_data['backing_ids'] = backing_ids
+        deduct_data['package_ids'] = package_ids
         if data.get('stretch_id'):
             deduct_data['stretch_id'] = data['stretch_id']
         try:
@@ -892,7 +914,7 @@ def get_order_detail(request, order_id):
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
-            package_quantity=order.package_quantity or 1,
+            package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -1068,7 +1090,7 @@ def get_order_detail(request, order_id):
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 podramnik_bridges=order.podramnik_bridges,
                 package_id=order.package.id if order.package else None,
-                package_quantity=order.package_quantity or 1,
+                package_ids=order.get_package_ids(),
                 molding_id=order.molding.id if order.molding else None,
                 molding_consumption=order.molding_consumption,
                 trosik_id=order.trosik.id if order.trosik else None,
@@ -1099,7 +1121,7 @@ def get_order_detail(request, order_id):
                 podramnik_id=order.podramnik.id if order.podramnik else None,
                 podramnik_bridges=order.podramnik_bridges,
                 package_id=order.package.id if order.package else None,
-                package_quantity=order.package_quantity or 1,
+                package_ids=order.get_package_ids(),
                 molding_id=order.molding.id if order.molding else None,
                 molding_consumption=order.molding_consumption,
                 trosik_id=order.trosik.id if order.trosik else None,
@@ -1203,7 +1225,11 @@ def get_order_detail(request, order_id):
                 'name': order.package.name,
                 'price': float(order.package.price),
             } if order.package else None,
-            'package_quantity': order.package_quantity or 1,
+            'packages': [
+                {'id': _pk.id, 'name': _pk.name, 'price': float(_pk.price)}
+                for _pk in (Package.objects.filter(pk=_pid).first() for _pid in order.get_package_ids())
+                if _pk
+            ],
             'quantity': order.quantity or 1,
             'molding': {
                 'id': order.molding.id,

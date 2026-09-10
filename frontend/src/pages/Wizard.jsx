@@ -75,8 +75,12 @@ export const Wizard = () => {
   const [podramnikId, setPodramnikId] = useState(
     orderData.podramnik_id || ''
   );
-  const [packageId, setPackageId] = useState(orderData.package_id || '');
-  const [packageQuantity, setPackageQuantity] = useState(orderData.package_quantity || 1);
+  // Упаковки — список (можно несколько разных)
+  const [selectedPackages, setSelectedPackages] = useState(
+    orderData.packages && orderData.packages.length
+      ? orderData.packages.map(String)
+      : (orderData.package_id ? [String(orderData.package_id)] : [])
+  );
   const [moldingId, setMoldingId] = useState(orderData.molding_id || '');
   const [moldingConsumption, setMoldingConsumption] = useState(
     orderData.molding_consumption || ''
@@ -254,6 +258,7 @@ export const Wizard = () => {
     orderData.hardware_id,
     orderData.hardware_quantity,
     orderData.package_id,
+    orderData.packages,
     orderData.molding_id,
     orderData.molding_consumption,
     orderData.trosik_id,
@@ -558,6 +563,21 @@ export const Wizard = () => {
     commitBackings(next);
   };
 
+  // Упаковки (список): обновление выбора и синхронизация с orderData
+  const commitPackages = (list) => {
+    setSelectedPackages(list);
+    const ids = list.filter(Boolean).map((v) => parseInt(v));
+    updateOrderData({ packages: ids, package_id: ids[0] || null });
+  };
+  const addPackageRow = () => commitPackages([...selectedPackages, '']);
+  const removePackageRow = (index) =>
+    commitPackages(selectedPackages.filter((_, i) => i !== index));
+  const changePackageRow = (index, value) => {
+    const next = [...selectedPackages];
+    next[index] = value;
+    commitPackages(next);
+  };
+
   // Шаг 2: Стекло, подкладка и подрамник вместе (всё опционально)
   const handleStep2Submit = (e) => {
     e.preventDefault();
@@ -616,14 +636,9 @@ export const Wizard = () => {
       updates.hardware_quantity = 1;
     }
 
-    if (packageId) {
-      updates.package_id = parseInt(packageId);
-      // Количество привязано к упаковке
-      updates.package_quantity = parseInt(packageQuantity) || 1;
-    } else {
-      updates.package_id = null;
-      updates.package_quantity = 1;
-    }
+    const packageIds = selectedPackages.filter(Boolean).map((v) => parseInt(v));
+    updates.packages = packageIds;
+    updates.package_id = packageIds[0] || null;
 
     updateOrderData(updates);
     setCurrentStep(5);
@@ -1660,57 +1675,49 @@ export const Wizard = () => {
                         </div>
                       </div>
 
-                      {/* Упаковка */}
+                      {/* Упаковки (можно несколько разных) */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
                           Упаковка{' '}
                           <span className="text-sm font-normal text-gray-500">
-                            (опционально)
+                            (опционально, можно несколько)
                           </span>
                         </h3>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Выберите упаковку
-                          </label>
-                          <select
-                            value={packageId}
-                            onChange={(e) => {
-                              const newPackageId = e.target.value;
-                              setPackageId(newPackageId);
-                              // Сразу обновляем orderData для пересчета цены
-                              updateOrderData({
-                                package_id: newPackageId ? parseInt(newPackageId) : null,
-                                package_quantity: newPackageId ? (parseInt(packageQuantity) || 1) : 1,
-                              });
-                            }}
-                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                        <div className="space-y-3">
+                          {selectedPackages.length === 0 && (
+                            <p className="text-sm text-gray-500">Упаковка не выбрана</p>
+                          )}
+                          {selectedPackages.map((val, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <select
+                                value={val}
+                                onChange={(e) => changePackageRow(index, e.target.value)}
+                                className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
+                              >
+                                <option value="">-- Выберите упаковку --</option>
+                                {packages.map((pkg) => (
+                                  <option key={pkg.id} value={pkg.id}>
+                                    {pkg.name} ({pkg.price} ₽)
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => removePackageRow(index)}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium px-2"
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={addPackageRow}
+                            className="wizard-button-add px-4 py-2 font-semibold"
                           >
-                            <option value="">-- Не выбрано --</option>
-                            {packages.map((pkg) => (
-                              <option key={pkg.id} value={pkg.id}>
-                                {pkg.name} ({pkg.price} ₽)
-                              </option>
-                            ))}
-                          </select>
+                            + Добавить упаковку
+                          </button>
                         </div>
-                        {packageId && (
-                          <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Количество упаковки
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={packageQuantity}
-                              onChange={(e) => {
-                                const q = parseInt(e.target.value) || 1;
-                                setPackageQuantity(q);
-                                updateOrderData({ package_quantity: q });
-                              }}
-                              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                            />
-                          </div>
-                        )}
                       </div>
                     </div>
 

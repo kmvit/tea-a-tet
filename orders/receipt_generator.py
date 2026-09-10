@@ -385,7 +385,7 @@ def generate_receipt_word(order_id):
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
-            package_quantity=order.package_quantity or 1,
+            package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -425,7 +425,7 @@ def generate_receipt_word(order_id):
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
-            package_quantity=order.package_quantity or 1,
+            package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -565,7 +565,7 @@ def generate_receipt_word(order_id):
         'hardware': ('ФУРНИТУРА:', 'quantity', 'шт'),
         'podramnik': ('ПОДРАМНИК:', None, None),
         'podramnik_bridges': ('ПЕРЕМЫЧКИ:', 'quantity', 'м'),
-        'package': ('УПАКОВКА:', 'quantity', 'шт'),
+        'package': ('УПАКОВКА:', None, None),
         'molding': ('МОЛДИНГ:', 'consumption', 'м'),
         'trosik': ('ТРОСИК:', 'length', 'м'),
         'podveski': ('ПОДВЕСКИ:', 'quantity', 'шт'),
@@ -615,6 +615,19 @@ def generate_receipt_word(order_id):
             component = calculation['components'][key]
             row = details_table.add_row()
             row.cells[2].text = "ПОДКЛАДКА:"
+            row.cells[3].text = component.get('name', '')
+            row.cells[6].text = f"{format_number(component.get('total_price', 0))} руб"
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        run.font.size = Pt(8)
+
+    # Дополнительные упаковки (package_2, package_3, ...)
+    for key in sorted(calculation.get('components', {}).keys()):
+        if key.startswith('package_'):
+            component = calculation['components'][key]
+            row = details_table.add_row()
+            row.cells[2].text = "УПАКОВКА:"
             row.cells[3].text = component.get('name', '')
             row.cells[6].text = f"{format_number(component.get('total_price', 0))} руб"
             for cell in row.cells:
@@ -785,7 +798,7 @@ def generate_receipt_html(order_id):
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
-            package_quantity=order.package_quantity or 1,
+            package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -823,7 +836,7 @@ def generate_receipt_html(order_id):
             podramnik_id=order.podramnik.id if order.podramnik else None,
             podramnik_bridges=order.podramnik_bridges,
             package_id=order.package.id if order.package else None,
-            package_quantity=order.package_quantity or 1,
+            package_ids=order.get_package_ids(),
             molding_id=order.molding.id if order.molding else None,
             molding_consumption=order.molding_consumption,
             trosik_id=order.trosik.id if order.trosik else None,
@@ -848,7 +861,7 @@ def generate_receipt_html(order_id):
         'hardware': ('ФУРНИТУРА:', 'quantity', 'шт'),
         'podramnik': ('ПОДРАМНИК:', None, None),
         'podramnik_bridges': ('ПЕРЕМЫЧКИ:', 'quantity', 'м'),
-        'package': ('УПАКОВКА:', 'quantity', 'шт'),
+        'package': ('УПАКОВКА:', None, None),
         'molding': ('МОЛДИНГ:', 'consumption', 'м'),
         'trosik': ('ТРОСИК:', 'length', 'м'),
         'podveski': ('ПОДВЕСКИ:', 'quantity', 'шт'),
@@ -918,6 +931,11 @@ def generate_receipt_html(order_id):
         if key.startswith('backing_'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'ПОДКЛАДКА:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
+    # Дополнительные упаковки (package_2, package_3, ...)
+    for key in sorted(calculation.get('components', {}).keys()):
+        if key.startswith('package_'):
+            c = calculation['components'][key]
+            detail_rows.append({'component': True, 'col2': 'УПАКОВКА:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
     # Подытог по материалам и переход к разделу «Работы»
     materials_total = Decimal(str(calculation.get('total_price', 0)))
     detail_rows.append({'subtotal': True, 'col2': 'ИТОГО МАТЕРИАЛОВ:', 'col6': format_number(materials_total)})

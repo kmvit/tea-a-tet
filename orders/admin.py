@@ -28,7 +28,7 @@ class OrderAdmin(admin.ModelAdmin):
                 'stretch',
                 'hardware', 'hardware_quantity',
                 'podramnik',
-                'package', 'package_quantity'
+                'package', 'packages_data'
             )
         }),
         ('Дополнительные компоненты (опционально)', {
