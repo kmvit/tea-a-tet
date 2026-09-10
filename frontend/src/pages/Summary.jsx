@@ -32,7 +32,7 @@ export const Summary = () => {
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
         podramnik_id: orderData.podramnik_id,
-        podramnik_bridges: orderData.podramnik_bridges,
+        podramnik2_id: orderData.podramnik2_id,
         package_id: (orderData.packages && orderData.packages[0]) || orderData.package_id || null,
         packages: orderData.packages || [],
         molding_id: orderData.molding_id,

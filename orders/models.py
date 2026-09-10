@@ -108,14 +108,22 @@ class Order(models.Model):
         blank=True,
         null=True
     )
+    podramnik2 = models.ForeignKey(
+        Podramnik,
+        on_delete=models.PROTECT,
+        verbose_name='Перемычки (из справочника подрамников)',
+        related_name='orders_as_bridges',
+        blank=True,
+        null=True,
+        help_text='Вторая позиция подрамника (перемычки). Считается по цене записи, фиксированно.'
+    )
     podramnik_bridges = models.DecimalField(
-        'Перемычки подрамника (м)',
+        'Перемычки подрамника (м) — не используется',
         max_digits=8,
         decimal_places=2,
         blank=True,
         null=True,
-        help_text='Метраж рейки на перемычки (по длине, по ширине, усиление углов). '
-                  'Стоимость = метраж × цена выбранной рейки.'
+        help_text='Устаревшее: раньше вводился метраж. Теперь перемычки выбираются из справочника.'
     )
 
     package = models.ForeignKey(
