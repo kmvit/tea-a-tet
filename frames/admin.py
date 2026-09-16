@@ -66,7 +66,8 @@ class MaterialAdmin(admin.ModelAdmin):
 
 @admin.register(Package)
 class PackageAdmin(admin.ModelAdmin):
-    list_display = ['name', 'price', 'stock_quantity', 'created_at']
+    list_display = ['name', 'price', 'no_master_work', 'stock_quantity', 'created_at']
+    list_editable = ['no_master_work']
     list_filter = ['created_at']
     search_fields = ['name']
     readonly_fields = ['created_at']

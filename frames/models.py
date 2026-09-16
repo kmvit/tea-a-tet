@@ -171,6 +171,11 @@ class Package(models.Model):
         default=0,
         help_text='Фактическое наличие на складе в штуках. Списывается при каждом заказе.'
     )
+    no_master_work = models.BooleanField(
+        'Без работы столяра',
+        default=False,
+        help_text='Отметьте для пакетов: упаковка идёт бесплатно, работа столяру не начисляется.'
+    )
     created_at = models.DateTimeField('Дата создания', auto_now_add=True)
     
     class Meta:

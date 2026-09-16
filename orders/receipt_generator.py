@@ -637,16 +637,25 @@ def generate_receipt_word(order_id):
                     for run in para.runs:
                         run.font.size = Pt(8)
 
+    # Работы и сложность (сложность делится пополам: материалы / работа столяра)
+    extras = OrderExtrasCalculator.for_order(order, frames)
+    _scale_extras_by_copies(extras, copies)
+    _manual = float(extras.get('manual_complexity', 0) or 0)
+    _manual_mat = round(_manual / 2, 2)
+    _manual_work = round(_manual - _manual_mat, 2)
+
+    # Сложность (материалы) — половина: клей, скобы и прочие расходники
+    if _manual_mat > 0:
+        _add_special_row('СЛОЖНОСТЬ (материалы):', price=_manual_mat, bold=False)
+
     # Подытог по материалам (calculation['total_price'] = сумма материалов)
-    materials_total = Decimal(str(calculation.get('total_price', 0)))
+    materials_total = Decimal(str(calculation.get('total_price', 0))) + Decimal(str(_manual_mat))
     _add_special_row('ИТОГО МАТЕРИАЛОВ:', price=materials_total)
 
     # ---------- Раздел «Работы» ----------
     _add_special_row('РАБОТЫ')
 
     # Работы (входят в стоимость) — по данным справочника технологических операций
-    extras = OrderExtrasCalculator.for_order(order, frames)
-    _scale_extras_by_copies(extras, copies)
     works_total = Decimal('0')
     for work in extras['works']['items']:
         works_total += Decimal(str(work['total']))
@@ -659,12 +668,12 @@ def generate_receipt_word(order_id):
                 for run in para.runs:
                     run.font.size = Pt(8)
 
-    # Ручная сложность
-    if extras.get('manual_complexity', 0) > 0:
-        works_total += Decimal(str(extras['manual_complexity']))
+    # Сложность (работа) — вторая половина
+    if _manual_work > 0:
+        works_total += Decimal(str(_manual_work))
         row = details_table.add_row()
-        row.cells[2].text = "СЛОЖНОСТЬ:"
-        row.cells[6].text = f"{format_number(extras['manual_complexity'])} руб"
+        row.cells[2].text = "СЛОЖНОСТЬ (работа):"
+        row.cells[6].text = f"{format_number(_manual_work)} руб"
         for cell in row.cells:
             for para in cell.paragraphs:
                 for run in para.runs:
@@ -940,21 +949,30 @@ def generate_receipt_html(order_id):
         if key.startswith('package_'):
             c = calculation['components'][key]
             detail_rows.append({'component': True, 'col2': 'УПАКОВКА:', 'col3': c.get('name', ''), 'col6': format_number(c.get('total_price', 0))})
+    # Работы и сложность (сложность делится пополам: материалы / работа столяра)
+    extras = OrderExtrasCalculator.for_order(order, frames)
+    _scale_extras_by_copies(extras, copies)
+    _manual = float(extras.get('manual_complexity', 0) or 0)
+    _manual_mat = round(_manual / 2, 2)
+    _manual_work = round(_manual - _manual_mat, 2)
+
+    # Сложность (материалы) — половина: клей, скобы и прочие расходники
+    if _manual_mat > 0:
+        detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ (материалы):', 'col6': format_number(_manual_mat)})
+
     # Подытог по материалам и переход к разделу «Работы»
-    materials_total = Decimal(str(calculation.get('total_price', 0)))
+    materials_total = Decimal(str(calculation.get('total_price', 0))) + Decimal(str(_manual_mat))
     detail_rows.append({'subtotal': True, 'col2': 'ИТОГО МАТЕРИАЛОВ:', 'col6': format_number(materials_total)})
     detail_rows.append({'section': True, 'col2': 'РАБОТЫ'})
 
     # Работы (входят в стоимость) — по данным справочника технологических операций
-    extras = OrderExtrasCalculator.for_order(order, frames)
-    _scale_extras_by_copies(extras, copies)
     works_total = Decimal('0')
     for work in extras['works']['items']:
         works_total += Decimal(str(work['total']))
         detail_rows.append({'component': True, 'col2': 'РАБОТА:', 'col3': work['name'], 'col6': format_number(work['total'])})
-    if extras.get('manual_complexity', 0) > 0:
-        works_total += Decimal(str(extras['manual_complexity']))
-        detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ:', 'col6': format_number(extras['manual_complexity'])})
+    if _manual_work > 0:
+        works_total += Decimal(str(_manual_work))
+        detail_rows.append({'component': True, 'col2': 'СЛОЖНОСТЬ (работа):', 'col6': format_number(_manual_work)})
     detail_rows.append({'subtotal': True, 'col2': 'ИТОГО РАБОТ:', 'col6': format_number(works_total)})
     if (order.quantity or 1) > 1:
         detail_rows.append({'component': True, 'col2': 'КОЛИЧЕСТВО КОПИЙ:', 'col3': str(order.quantity)})

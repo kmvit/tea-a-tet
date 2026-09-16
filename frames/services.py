@@ -559,7 +559,9 @@ class OrderExtrasCalculator:
         pkg_ids_work = [(p.get('package_id') if isinstance(p, dict) else p) for p in pkg_ids_work if p]
         for pid in [p for p in pkg_ids_work if p]:
             package = Package.objects.filter(pk=pid).first()
-            if package:
+            # Для пакетов (галочка «Без работы столяра») работа не начисляется:
+            # в пакет кладём бесплатно.
+            if package and not package.no_master_work:
                 add_work('package', 0, label=f'Упаковка ({package.name})',
                          rate_override=_okr(package.price / 2))
 
@@ -673,12 +675,24 @@ class OrderExtrasCalculator:
                 w['total'] = w['total'] * qty
             works['total_rate'] = works['total_rate'] * qty
             works['work_time_hours'] = round(works['work_time_hours'] * qty, 2)
+        # Сложность делится пополам: половина в материалы (клей, скобы, расходники),
+        # половина — в работу столяра.
         manual_total = manual * qty
+        manual_materials = round(manual_total / 2, 2)
+        manual_work = round(manual_total - manual_materials, 2)
         if manual_total > 0:
             calculation.setdefault('components', {})['manual_complexity'] = {
-                'name': 'Сложность', 'total_price': manual_total
+                'name': 'Сложность (материалы)', 'total_price': manual_materials
             }
-        calculation['total_price'] = materials_per_copy * qty + works['total_rate'] + manual_total
+            works.setdefault('items', []).append({
+                'operation_type': 'complexity',
+                'name': 'Сложность (работа)',
+                'rate': manual_work,
+                'quantity': 1,
+                'total': manual_work,
+            })
+            works['total_rate'] = works.get('total_rate', 0) + manual_work
+        calculation['total_price'] = materials_per_copy * qty + works['total_rate'] + manual_materials
         calculation['works'] = works
         calculation['quantity'] = qty
         return calculation
