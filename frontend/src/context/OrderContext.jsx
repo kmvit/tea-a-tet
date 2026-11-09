@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { calculatePrice } from '../api';
 
 const OrderContext = createContext();
@@ -25,6 +25,7 @@ export const OrderProvider = ({ children }) => {
     backings: [],
     foamboard_id: null,
     stretch_id: null,
+    mount_count: 0,
     podramnik_id: null,
     podramnik2_id: null,
     podramnik_bridges: null,
@@ -51,6 +52,7 @@ export const OrderProvider = ({ children }) => {
   });
 
   const [priceCalculation, setPriceCalculation] = useState(null);
+  const priceRequest = useRef(0);
   const [paintingImage, setPaintingImage] = useState(null);
 
   const updateOrderData = useCallback((updates) => {
@@ -58,6 +60,7 @@ export const OrderProvider = ({ children }) => {
   }, []);
 
   const calculateCurrentPrice = useCallback(async () => {
+    const request = ++priceRequest.current;
     try {
       // Размер картины: если рама добавлена — берём из Рамы 1, иначе глобальный
       const x1 = orderData.frames?.[0]?.x1 ?? orderData.x1;
@@ -90,6 +93,7 @@ export const OrderProvider = ({ children }) => {
         podveski_id: orderData.podveski_id,
         podveski_quantity: orderData.podveski_quantity,
         stretch_id: orderData.stretch_id,
+        mount_count: orderData.mount_count || 0,
         manual_complexity: orderData.manual_complexity,
         quantity: orderData.quantity,
       };
@@ -113,7 +117,7 @@ export const OrderProvider = ({ children }) => {
       }
       
       const response = await calculatePrice(dataToSend);
-      setPriceCalculation(response.data);
+      if (request === priceRequest.current) setPriceCalculation(response.data);
       return response.data;
     } catch (error) {
       const msg = error.response?.data?.error || error.message;
@@ -123,6 +127,7 @@ export const OrderProvider = ({ children }) => {
   }, [orderData]);
 
   const resetOrder = useCallback(() => {
+    priceRequest.current += 1;
     setOrderData({
       x1: null,
       x2: null,
@@ -133,6 +138,7 @@ export const OrderProvider = ({ children }) => {
       backings: [],
       foamboard_id: null,
       stretch_id: null,
+      mount_count: 0,
       podramnik2_id: null,
       podramnik_bridges: null,
       hardware_id: null,

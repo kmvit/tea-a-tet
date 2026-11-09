@@ -1023,10 +1023,21 @@ th {{ text-align: center; font-weight: bold; }}
 .total {{ font-weight: bold; font-size: 11pt; margin-top: 10px; text-align: right; }}
 .signs {{ display: flex; justify-content: space-between; margin-top: 30px; }}
 .sign-box {{ width: 45%; }}
-@media print {{ body {{ padding: 0; }} }}
+@page {{ size: A4; margin: 5mm; }}
+.order-tag {{ margin: 6px 0; break-inside: avoid; }}
+@media print {{
+  body {{ padding: 0; max-width: none; width: 196mm; font-size: 9pt; }}
+  .receipt {{ zoom: var(--print-scale, 1); }}
+  p {{ margin: 4px 0; }}
+  table {{ font-size: 8pt; margin: 4px 0; }}
+  th, td {{ padding: 2px 4px; }}
+  tr {{ break-inside: avoid; }}
+  .dashed {{ margin: 6px 0; }}
+}}
 </style>
 </head>
 <body>
+<div class="receipt">
 <table style="border:none"><tr><td style="border:none;vertical-align:top">
 <p class="center" style="font-weight:bold;font-size:11pt">Квитанция заказа № {order.pk} от {date_str}</p>
 <p><b>Сумма: {format_number(order.total_price)} руб</b></p>
@@ -1044,6 +1055,10 @@ th {{ text-align: center; font-weight: bold; }}
 </td><td style="border:none;vertical-align:top;font-size:9pt">
 {customer_info} | Аванс: {format_number(order.advance_payment)} руб | <b>Сумма: {format_number(order.total_price)} руб</b>
 </td></tr></table>
+<div class="order-tag">
+<span style="font-size:10pt">Заказ №</span>
+<span style="font-size:24pt;font-weight:bold;line-height:1">{order.pk}</span>
+</div>
 <p style="font-weight:bold;font-size:10pt">Пункты заказа:</p>
 <table>
 <tr><th>Кол-во</th><th>Время</th><th></th><th>размер</th><th>ширина</th><th>цена</th><th>стоимость</th></tr>
@@ -1051,11 +1066,30 @@ th {{ text-align: center; font-weight: bold; }}
 </table>
 <p class="total">ИТОГО ПО ЗАКАЗУ: {format_number(order.total_price)} руб</p>
 {f'<p style="margin-top:10px;font-size:9pt"><b>Комментарий:</b> {esc(order.comment.strip())}</p>' if order.comment and order.comment.strip() else ''}
-<div style="margin-top:14px;text-align:left">
-<span style="font-size:10pt">Заказ №</span>
-<span style="font-size:40pt;font-weight:bold;line-height:1">{order.pk}</span>
+
 </div>
-<script>window.onload=function(){{window.print();}}</script>
+<script>
+function fitReceipt() {{
+  const receipt = document.querySelector('.receipt');
+  document.documentElement.style.setProperty('--print-scale', '1');
+  // Measure using the same width and compact styles as the printed A4 page.
+  const measure = document.createElement('div');
+  measure.style.cssText = 'position:absolute;left:-10000px;top:0;width:196mm;font:9pt Arial';
+  measure.innerHTML = receipt.innerHTML;
+  const style = document.createElement('style');
+  style.textContent = '#print-measure p{{margin:4px 0}} #print-measure table{{font-size:8pt;margin:4px 0}} #print-measure th,#print-measure td{{padding:2px 4px}} #print-measure .dashed{{margin:6px 0}}';
+  measure.id = 'print-measure';
+  document.head.appendChild(style);
+  document.body.appendChild(measure);
+  const pageHeight = 285 * 96 / 25.4;
+  const scale = Math.min(1, pageHeight / measure.getBoundingClientRect().height);
+  document.documentElement.style.setProperty('--print-scale', String(scale));
+  measure.remove();
+  style.remove();
+}}
+window.addEventListener('beforeprint', fitReceipt);
+window.onload = function() {{ fitReceipt(); window.print(); }};
+</script>
 </body>
 </html>'''
     return html

@@ -475,7 +475,10 @@ class OrderExtrasCalculator:
             compP = PD
 
         # ---------- Сложность крепления объекта (СложностьКрОбТ) ----------
-        mount = int(data.get('mount_count') or 0)
+        mount_value = Decimal(str(data.get('mount_count') or 0))
+        if not mount_value.is_finite() or mount_value < 0 or mount_value != mount_value.to_integral_value():
+            raise ValueError('Количество предметов должно быть целым неотрицательным числом')
+        mount = int(mount_value)
         compMount = Decimal(mount * 20) if mount > 0 else Decimal('0')
 
         # ---------- Работы (справочно) ----------
@@ -498,6 +501,13 @@ class OrderExtrasCalculator:
                 'rate': float(rate),
                 'quantity': 1,
                 'total': float(rate),
+            })
+
+        if mount > 0:
+            works.append({
+                'operation_type': 'object_mount',
+                'name': f'Крепление предметов ({mount} шт × 100 ₽)',
+                'rate': 100.0, 'quantity': mount, 'total': float(mount * 100),
             })
 
         # Рама: тип работы = число рам (1→рама, 2→двойная, 3→тройная), размер внешней рамы
@@ -644,6 +654,7 @@ class OrderExtrasCalculator:
             'package_id': order.package_id,
             'package_ids': order.get_package_ids(),
             'stretch_id': order.stretch_id,
+            'mount_count': order.mount_count,
             'trosik_id': order.trosik_id,
             'podveski_id': order.podveski_id,
             'manual_complexity': order.manual_complexity,

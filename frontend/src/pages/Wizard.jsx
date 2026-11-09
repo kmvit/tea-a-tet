@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useOrder } from '../context/OrderContext';
 import {
   getBaguettes,
@@ -13,7 +13,6 @@ import {
   getPodveski,
   getPassepartout,
   getStretches,
-  getFoamboards,
 } from '../api';
 import { ProgressBar } from '../components/ProgressBar';
 import { PricePanel } from '../components/PricePanel';
@@ -21,7 +20,8 @@ import { PricePanel } from '../components/PricePanel';
 export const Wizard = () => {
   const navigate = useNavigate();
   const { orderData, updateOrderData, calculateCurrentPrice, priceCalculation } = useOrder();
-  const [currentStep, setCurrentStep] = useState(1);
+  const location = useLocation();
+  const [currentStep, setCurrentStep] = useState(location.state?.step || 1);
 
   // Данные для всех шагов
   const [baguettes, setBaguettes] = useState([]);
@@ -35,7 +35,6 @@ export const Wizard = () => {
   const [podveski, setPodveski] = useState([]);
   const [passepartout, setPassepartout] = useState([]);
   const [stretches, setStretches] = useState([]);
-  const [foamboards, setFoamboards] = useState([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -94,7 +93,6 @@ export const Wizard = () => {
     orderData.podveski_quantity || ''
   );
   const [stretchId, setStretchId] = useState(orderData.stretch_id || '');
-  const [foamboardId, setFoamboardId] = useState(orderData.foamboard_id || '');
   // Перемычки — вторая позиция из справочника подрамников
   const [podramnik2Id, setPodramnik2Id] = useState(orderData.podramnik2_id || '');
   const [podramnikBridges, setPodramnikBridges] = useState(
@@ -105,7 +103,7 @@ export const Wizard = () => {
   const [customerName, setCustomerName] = useState(orderData.customer_name || '');
   const [customerPhone, setCustomerPhone] = useState(orderData.customer_phone || '');
   const [paymentMethod, setPaymentMethod] = useState(orderData.payment_method || 'наличные');
-  const [advancePayment, setAdvancePayment] = useState(orderData.advance_payment || '');
+  const [advancePayment, setAdvancePayment] = useState(orderData.advance_payment ?? '');
 
   // --- Автоподстановка размеров (ТЗ) ---
   // Внешний размер паспарту, размеры Рам 2/3 и расход молдинга подставляются
@@ -149,7 +147,6 @@ export const Wizard = () => {
           podveskiRes,
           passepartoutRes,
           stretchesRes,
-          foamboardsRes,
         ] = await Promise.all([
           getBaguettes(),
           getGlasses(),
@@ -162,7 +159,6 @@ export const Wizard = () => {
           getPodveski(),
           getPassepartout(),
           getStretches(),
-          getFoamboards(),
         ]);
 
         setBaguettes(baguettesRes.data);
@@ -176,7 +172,6 @@ export const Wizard = () => {
         setPodveski(podveskiRes.data);
         setPassepartout(passepartoutRes.data);
         setStretches(stretchesRes.data);
-        setFoamboards(foamboardsRes.data);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
       } finally {
@@ -269,6 +264,9 @@ export const Wizard = () => {
     orderData.podveski_id,
     orderData.podveski_quantity,
     orderData.stretch_id,
+    orderData.mount_count,
+    orderData.manual_complexity,
+    orderData.quantity,
   ]);
 
   // Синхронизация локального состояния с orderData
@@ -589,7 +587,6 @@ export const Wizard = () => {
       glass_id: glassId ? parseInt(glassId) : null,
       backings: backingIds,
       backing_id: backingIds[0] || null,
-      foamboard_id: foamboardId ? parseInt(foamboardId) : null,
       podramnik_id: podramnikId ? parseInt(podramnikId) : null,
       podramnik2_id: podramnik2Id ? parseInt(podramnik2Id) : null,
       podramnik_bridges: podramnik2Id && podramnikBridges ? parseFloat(podramnikBridges) : null,
@@ -662,11 +659,16 @@ export const Wizard = () => {
       return;
     }
 
+    if (advancePayment === '' || !Number.isFinite(Number(advancePayment)) || Number(advancePayment) < 0) {
+      setErrors({ advance_payment: 'Укажите сумму аванса. Если оплаты нет, введите 0.' });
+      return;
+    }
+
     const updates = {
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim(),
       payment_method: paymentMethod,
-      advance_payment: advancePayment ? parseFloat(advancePayment) : null,
+      advance_payment: Number(advancePayment),
     };
 
     updateOrderData(updates);
@@ -1340,37 +1342,6 @@ export const Wizard = () => {
                         </div>
                       </div>
 
-                      {/* Пенокартон (накатка) — материал по кв.м */}
-                      <div className="wizard-section p-6">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                          Накатка на пенокартон{' '}
-                          <span className="text-sm font-normal text-gray-500">
-                            (опционально)
-                          </span>
-                        </h3>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Выберите пенокартон
-                          </label>
-                          <select
-                            value={foamboardId}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setFoamboardId(v);
-                              updateOrderData({ foamboard_id: v ? parseInt(v) : null });
-                            }}
-                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                          >
-                            <option value="">-- Не выбрано --</option>
-                            {foamboards.map((fb) => (
-                              <option key={fb.id} value={fb.id}>
-                                {fb.name} ({fb.price} ₽/кв.м)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
                       {/* Подрамник */}
                       <div className="wizard-section p-6">
                         <h3 className="text-xl font-semibold text-gray-800 mb-4">
@@ -1479,6 +1450,16 @@ export const Wizard = () => {
                               </option>
                             ))}
                           </select>
+                        </div>
+                        <div className="mt-4">
+                          <label htmlFor="mount-count" className="block text-sm font-medium text-gray-700 mb-2">
+                            Крепление предметов — количество (100 ₽/шт)
+                          </label>
+                          <input id="mount-count" type="number" min="0" step="1"
+                            value={orderData.mount_count ?? 0}
+                            onChange={(e) => updateOrderData({ mount_count: e.target.value === '' ? '' : Number(e.target.value) })}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg" />
+                          <p className="text-xs text-gray-500 mt-1">На одно изделие. Полностью входит в работу столяра.</p>
                         </div>
                       </div>
                     </div>
@@ -1739,6 +1720,14 @@ export const Wizard = () => {
                           </button>
                         </div>
                       </div>
+                      <div className="wizard-section p-6">
+                        <label htmlFor="manual-complexity" className="block text-sm font-medium text-gray-700 mb-2">Сложность (доп. сумма, ₽)</label>
+                        <input id="manual-complexity" type="number" min="0" step="0.01"
+                          value={orderData.manual_complexity ?? ''}
+                          onChange={(e) => updateOrderData({ manual_complexity: e.target.value === '' ? null : Number(e.target.value) })}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg" placeholder="0" />
+                        <p className="text-xs text-gray-500 mt-1">На одно изделие. Добавляется к итоговой стоимости полностью.</p>
+                      </div>
                     </div>
 
                     <div className="flex justify-between pt-4">
@@ -1837,17 +1826,20 @@ export const Wizard = () => {
                       {/* Аванс */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Аванс (руб) <span className="text-gray-500 text-xs">(опционально)</span>
+                          Аванс (руб) <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={advancePayment}
+                          required
                           onChange={(e) => setAdvancePayment(e.target.value)}
                           className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
                           placeholder="0.00"
                         />
+                        {errors.advance_payment && <p className="mt-1 text-sm text-red-500">{errors.advance_payment}</p>}
+                        <p className="mt-1 text-xs text-gray-500">Если оплаты нет, введите 0.</p>
                         {priceCalculation?.total_price && (
                           <p className="mt-2 text-sm text-gray-600">
                             Итоговая сумма: <strong>{priceCalculation.total_price.toFixed(2)} ₽</strong>

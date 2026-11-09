@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useOrder } from '../context/OrderContext';
+import { previewGeometry } from '../utils/previewGeometry';
 
 const DEFAULT_FRAME_WIDTH = 50;
 const PASSEPARTOUT_COLOR = '#f5f5dc';
@@ -15,34 +16,13 @@ export const FramePreview = ({ showLabel = true }) => {
   const { orderData, paintingImage } = useOrder();
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const renderVersion = useRef(0);
 
-  // Размеры картины (из первой рамы или orderData)
-  const getPaintingDimensions = () => {
-    const frames = orderData.frames || [];
-    const isSingle = frames.length <= 1;
-    const firstFrame = frames[0];
-    const x1 = isSingle ? (orderData.x1 ?? firstFrame?.x1) : firstFrame?.x1;
-    const x2 = isSingle ? (orderData.x2 ?? firstFrame?.x2) : firstFrame?.x2;
-    return { x1: parseFloat(x1) || 30, x2: parseFloat(x2) || 20 };
-  };
-
-  // Собираем слои вложенно: сначала все паспарту, затем все рамы.
   const getAllLayers = () => {
     const frames = orderData.frames || [];
-    const passepartouts = orderData.passepartouts || [];
     const layers = [];
-    for (const pp of passepartouts) {
-      if (pp?.passepartout_id) {
-        layers.push({
-          type: 'passepartout',
-          width: 25,
-          color: PASSEPARTOUT_COLOR,
-          image: pp?.passepartout_image || null,
-        });
-      }
-    }
     for (const frame of frames) {
-      if ((frame?.baguette_id && frame?.baguette_image) || (orderData.baguette_id && orderData.baguette_image)) {
+      if (frame?.baguette_id || orderData.baguette_id) {
         const img = frame?.baguette_image || orderData.baguette_image;
         const w = frame?.baguette_width ?? orderData.baguette_width;
         layers.push({ type: 'baguette', image: img, width: w });
@@ -68,16 +48,6 @@ export const FramePreview = ({ showLabel = true }) => {
     octx.drawImage(imgOrCanvas, -srcW / 2, -srcH / 2);
     octx.restore();
     return off;
-  };
-
-  const makePassepartoutStrip = (fw, length, color) => {
-    const strip = document.createElement('canvas');
-    strip.width = length;
-    strip.height = fw;
-    const sctx = strip.getContext('2d');
-    sctx.fillStyle = color;
-    sctx.fillRect(0, 0, strip.width, strip.height);
-    return strip;
   };
 
   const round = (v) => Math.round(v);
@@ -112,18 +82,7 @@ export const FramePreview = ({ showLabel = true }) => {
     ctx.restore();
   };
 
-  const clampFrameWidth = (fw, clampW, clampH) => {
-    const clampMax = Math.max(1, Math.floor(Math.min(clampW, clampH) / 2));
-    return Math.max(1, Math.min(fw, clampMax));
-  };
-
-  const computeFrameWidth = (texImgOrCanvas, clampW, clampH, overridePxOrNull) => {
-    const h = texImgOrCanvas.height ?? texImgOrCanvas.naturalHeight;
-    const chosen = overridePxOrNull ?? h;
-    return clampFrameWidth(chosen, clampW, clampH);
-  };
-
-  const drawFrameLayer = (ctx, canvas, { contentRect, texImgOrCanvas, fw, isPassepartout = false, passepartoutColor }) => {
+  const drawFrameLayer = (ctx, canvas, { contentRect, texImgOrCanvas, fw }) => {
     const { x, y, w, h } = contentRect;
     const fwInt = Math.round(fw);
     const ox = round(x - fwInt);
@@ -131,18 +90,10 @@ export const FramePreview = ({ showLabel = true }) => {
     const ow = round(w + 2 * fwInt);
     const oh = round(h + 2 * fwInt);
     let stripTop, stripBottom, stripLeft, stripRight;
-    if (isPassepartout) {
-      const len = Math.max(ow, oh) * 2;
-      stripTop = makePassepartoutStrip(fwInt, len, passepartoutColor);
-      stripBottom = stripTop;
-      stripLeft = makeStripCanvas(stripTop, { rotate: 90 });
-      stripRight = makeStripCanvas(stripTop, { rotate: 90 });
-    } else {
-      stripTop = makeStripCanvas(texImgOrCanvas, { rotate: 0, flipY: ORIENT.topFlipY });
-      stripBottom = makeStripCanvas(texImgOrCanvas, { rotate: 0, flipY: ORIENT.bottomFlipY });
-      stripLeft = makeStripCanvas(texImgOrCanvas, { rotate: ORIENT.leftRotate });
-      stripRight = makeStripCanvas(texImgOrCanvas, { rotate: 90, flipX: ORIENT.rightFlipX });
-    }
+    stripTop = makeStripCanvas(texImgOrCanvas, { rotate: 0, flipY: ORIENT.topFlipY });
+    stripBottom = makeStripCanvas(texImgOrCanvas, { rotate: 0, flipY: ORIENT.bottomFlipY });
+    stripLeft = makeStripCanvas(texImgOrCanvas, { rotate: ORIENT.leftRotate });
+    stripRight = makeStripCanvas(texImgOrCanvas, { rotate: 90, flipX: ORIENT.rightFlipX });
     const topPoly = [[ox, oy], [ox + ow, oy], [ox + ow - fwInt, oy + fwInt], [ox + fwInt, oy + fwInt]];
     const bottomPoly = [[ox + fwInt, oy + oh - fwInt], [ox + ow - fwInt, oy + oh - fwInt], [ox + ow, oy + oh], [ox, oy + oh]];
     const leftPoly = [[ox, oy], [ox + fwInt, oy + fwInt], [ox + fwInt, oy + oh - fwInt], [ox, oy + oh]];
@@ -155,6 +106,7 @@ export const FramePreview = ({ showLabel = true }) => {
   };
 
   const drawFrame = () => {
+    const version = ++renderVersion.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -167,61 +119,23 @@ export const FramePreview = ({ showLabel = true }) => {
       (orderData.passepartouts && orderData.passepartouts.some((pp) => pp.passepartout_id)) ||
       orderData.baguette_id;
     if (!hasBaguetteOrPp) return;
-    const { x1, x2 } = getPaintingDimensions();
-    // x1 — высота, x2 — ширина. Пропорция холста = ширина / высота
-    const aspectRatio = x2 / x1;
-    const totalLayersFw = layers.length > 0
-      ? layers.reduce((acc, l) => acc + (l.type === 'passepartout' ? Math.min(l.width, 30) : DEFAULT_FRAME_WIDTH), 0)
-      : DEFAULT_FRAME_WIDTH * 2;
-    const availableW = maxWidth - totalLayersFw;
-    const availableH = maxHeight - totalLayersFw;
-    let pw, ph;
-    if (aspectRatio > 1) {
-      pw = availableW;
-      ph = availableW / aspectRatio;
-      if (ph > availableH) {
-        ph = availableH;
-        pw = availableH * aspectRatio;
-      }
-    } else {
-      ph = availableH;
-      pw = availableH * aspectRatio;
-      if (pw > availableW) {
-        pw = availableW;
-        ph = availableW / aspectRatio;
-      }
-    }
-    const iw = pw;
-    const ih = ph;
-    const widths = [];
-    let curW = iw;
-    let curH = ih;
-    for (const layer of layers) {
-      let fw;
-      if (layer.type === 'passepartout') {
-        fw = clampFrameWidth(Math.min(layer.width, 30), curW, curH);
-      } else {
-        const overrideVal = layer.width ? Math.round(Number(layer.width) * 5) : null;
-        fw = overrideVal ? clampFrameWidth(overrideVal, curW, curH) : clampFrameWidth(DEFAULT_FRAME_WIDTH, curW, curH);
-      }
-      widths.push(fw);
-      curW += 2 * fw;
-      curH += 2 * fw;
-    }
-    if (widths.length === 0) widths.push(DEFAULT_FRAME_WIDTH);
+    const { height, width, mats } = previewGeometry(orderData);
+    const unit = 5;
+    const iw = width * unit;
+    const ih = height * unit;
+    const widths = layers.map((layer) => Number(layer.width) > 0 ? Number(layer.width) * unit : DEFAULT_FRAME_WIDTH);
     const totalInset = widths.reduce((a, b) => a + b, 0);
-    const outW = iw + 2 * totalInset;
-    const outH = ih + 2 * totalInset;
+    const outW = Math.ceil(iw + 2 * totalInset);
+    const outH = Math.ceil(ih + 2 * totalInset);
     const scale = Math.min(maxWidth / outW, maxHeight / outH, 1);
     canvas.width = outW;
     canvas.height = outH;
-    ctx.clearRect(0, 0, outW, outH);
     canvas.style.width = outW * scale + 'px';
     canvas.style.height = outH * scale + 'px';
-    const photoX = Math.round(totalInset);
-    const photoY = Math.round(totalInset);
-    const iwInt = Math.round(iw);
-    const ihInt = Math.round(ih);
+    const photoX = totalInset;
+    const photoY = totalInset;
+    const iwInt = iw;
+    const ihInt = ih;
     const createPlaceholder = () => {
       const p = document.createElement('canvas');
       p.width = 64;
@@ -238,8 +152,7 @@ export const FramePreview = ({ showLabel = true }) => {
         img.onerror = () => resolve(createPlaceholder());
         img.src = url;
       });
-    const layersWithImages = layers.filter((l) => l.image);
-    const imageUrls = layersWithImages.map((l) => l.image || null);
+    const imageUrls = [...layers.map((l) => l.image), ...mats.map((m) => m.passepartout_image)];
     const loadPainting = () =>
       paintingImage && typeof paintingImage === 'string'
         ? new Promise((resolve) => {
@@ -255,40 +168,43 @@ export const FramePreview = ({ showLabel = true }) => {
     ]).then((results) => {
       const loadedImgs = results.slice(0, imageUrls.length);
       const photoImg = results[results.length - 1];
+      if (version !== renderVersion.current) return;
+      if (canvas.width !== outW || canvas.height !== outH) return;
       ctx.clearRect(0, 0, outW, outH);
+      const paintingWidth = Math.min(width, ...mats.map((m) => m.windowWidth)) * unit;
+      const paintingHeight = Math.min(height, ...mats.map((m) => m.windowHeight)) * unit;
+      const paintingX = photoX + (iw - paintingWidth) / 2;
+      const paintingY = photoY + (ih - paintingHeight) / 2;
       if (photoImg) {
-        ctx.drawImage(photoImg, photoX, photoY, iwInt, ihInt);
+        ctx.drawImage(photoImg, paintingX, paintingY, paintingWidth, paintingHeight);
       } else {
         ctx.fillStyle = '#f8f9fa';
         ctx.fillRect(photoX, photoY, iwInt, ihInt);
       }
+      // Paint each sheet only outside its actual window. Both axes share one scale.
+      [...mats.entries()].reverse().forEach(([index, mat]) => {
+        const outerW = mat.outerWidth * unit;
+        const outerH = mat.outerHeight * unit;
+        const windowW = mat.windowWidth * unit;
+        const windowH = mat.windowHeight * unit;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(photoX + (iw - outerW) / 2, photoY + (ih - outerH) / 2, outerW, outerH);
+        ctx.rect(photoX + (iw - windowW) / 2, photoY + (ih - windowH) / 2, windowW, windowH);
+        ctx.clip('evenodd');
+        const texture = loadedImgs[layers.length + index];
+        ctx.fillStyle = texture ? ctx.createPattern(texture, 'repeat') : PASSEPARTOUT_COLOR;
+        ctx.fillRect(photoX, photoY, iw, ih);
+        ctx.restore();
+      });
       let rect = { x: photoX, y: photoY, w: iwInt, h: ihInt };
-      let imageIdx = 0;
       const localCanvas = { width: outW, height: outH };
-      for (let i = 0; i < layers.length; i++) {
-        const layer = layers[i];
-        const fw = widths[i] ?? DEFAULT_FRAME_WIDTH;
-        if (layer.type === 'passepartout') {
-          const ppImg = layer.image ? loadedImgs[imageIdx++] : null;
-          if (ppImg) {
-            const actualFw = computeFrameWidth(ppImg, rect.w, rect.h, fw);
-            rect = drawFrameLayer(ctx, localCanvas, { contentRect: rect, texImgOrCanvas: ppImg, fw: actualFw });
-          } else {
-            rect = drawFrameLayer(ctx, localCanvas, {
-              contentRect: rect,
-              texImgOrCanvas: null,
-              fw,
-              isPassepartout: true,
-              passepartoutColor: layer.color ?? PASSEPARTOUT_COLOR,
-            });
-          }
-        } else {
-          const baguetteImg = loadedImgs[imageIdx++];
-          const actualFw = baguetteImg ? computeFrameWidth(baguetteImg, rect.w, rect.h, fw) : fw;
-          rect = drawFrameLayer(ctx, localCanvas, { contentRect: rect, texImgOrCanvas: baguetteImg, fw: actualFw });
-        }
-      }
-      if (layers.length === 0 && hasBaguetteOrPp) {
+      layers.forEach((layer, index) => {
+        rect = drawFrameLayer(ctx, localCanvas, {
+          contentRect: rect, texImgOrCanvas: loadedImgs[index] || createPlaceholder(), fw: widths[index],
+        });
+      });
+      if (layers.length === 0 && !mats.length && hasBaguetteOrPp) {
         ctx.strokeStyle = '#8b5cf6';
         ctx.lineWidth = DEFAULT_FRAME_WIDTH;
         ctx.strokeRect(photoX - DEFAULT_FRAME_WIDTH / 2, photoY - DEFAULT_FRAME_WIDTH / 2, iwInt + DEFAULT_FRAME_WIDTH, ihInt + DEFAULT_FRAME_WIDTH);

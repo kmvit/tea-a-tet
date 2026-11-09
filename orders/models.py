@@ -208,6 +208,11 @@ class Order(models.Model):
         help_text='Дополнительная сумма за сложность, вводится вручную. Добавляется к цене полностью.'
     )
 
+    mount_count = models.PositiveIntegerField(
+        'Количество предметов для крепления', default=0,
+        help_text='На одно изделие, 100 руб. за предмет — работа столяра.'
+    )
+
     # Итоговая информация
     total_price = models.DecimalField('Итоговая цена (руб)', max_digits=12, decimal_places=2)
     advance_payment = models.DecimalField('Аванс (руб)', max_digits=12, decimal_places=2, default=0)

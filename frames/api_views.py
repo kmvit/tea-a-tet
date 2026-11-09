@@ -549,6 +549,12 @@ def create_order_api(request):
     try:
         data = request.data
         
+        if data.get('advance_payment') in (None, ''):
+            return Response({'error': 'Укажите сумму аванса. Если оплаты нет, введите 0.'}, status=400)
+        advance = Decimal(str(data['advance_payment']))
+        if not advance.is_finite() or advance < 0 or advance != advance.quantize(Decimal('0.01')):
+            return Response({'error': 'Аванс должен быть неотрицательной суммой с точностью до копеек.'}, status=400)
+
         # Проверяем наличие массив рамок
         frames = data.get('frames', [])
         passepartouts = _collect_passepartouts(data.get('passepartouts', []), frames)
@@ -780,6 +786,7 @@ def create_order_api(request):
         )
         order_quantity = int(data.get('quantity') or 1) or 1
         order_data['quantity'] = order_quantity
+        order_data['mount_count'] = int(data.get('mount_count') or 0)
         OrderExtrasCalculator.apply(calculation, extras, quantity=order_quantity)
 
         order_data['total_price'] = Decimal(str(calculation['total_price']))
@@ -794,14 +801,9 @@ def create_order_api(request):
             order_data['comment'] = data.get('comment').strip()
         if data.get('payment_method'):
             order_data['payment_method'] = data.get('payment_method')
-        if data.get('advance_payment'):
-            order_data['advance_payment'] = Decimal(str(data.get('advance_payment')))
-            # Автоматически рассчитываем долг
-            order_data['debt'] = order_data['total_price'] - order_data['advance_payment']
-        else:
-            order_data['advance_payment'] = Decimal('0')
-            order_data['debt'] = order_data['total_price']
-        
+        order_data['advance_payment'] = advance
+        order_data['debt'] = order_data['total_price'] - advance
+
         # Сохраняем все рамы в JSON
         if frames and len(frames) > 0:
             frames_to_save = [dict(frame) for frame in frames]
@@ -1163,6 +1165,7 @@ def get_order_detail(request, order_id):
             'molding_id': order.molding_id,
             'package_id': order.package_id,
             'stretch_id': order.stretch_id,
+            'mount_count': order.mount_count,
             'trosik_id': order.trosik_id,
             'podveski_id': order.podveski_id,
             'manual_complexity': order.manual_complexity,
@@ -1263,6 +1266,7 @@ def get_order_detail(request, order_id):
             'payment_method': order.payment_method,
             'advance_payment': float(order.advance_payment) if order.advance_payment else 0,
             'debt': float(order.debt) if order.debt else 0,
+            'mount_count': order.mount_count,
             'manual_complexity': float(order.manual_complexity) if order.manual_complexity else 0,
         }
 

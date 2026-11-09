@@ -25,7 +25,7 @@ class OrderAdmin(admin.ModelAdmin):
                 'baguette',
                 'glass',
                 'backing',
-                'stretch',
+                'stretch', 'mount_count',
                 'hardware', 'hardware_quantity',
                 'podramnik',
                 'package', 'packages_data'

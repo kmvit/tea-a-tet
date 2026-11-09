@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { WorksPanel } from '../components/WorksPanel';
 import { getOrders, getOrderDetail, updateOrderStatus, generateReceipt } from '../api';
 
 const STATUS_COLORS = {
@@ -219,7 +220,7 @@ export const Cabinet = () => {
                                 {order.customer_phone && ` (${order.customer_phone})`}
                               </p>
                             )}
-                            {order.advance_payment > 0 && (
+                            {order.advance_payment != null && (
                               <p className="text-xs text-gray-500 mt-1">
                                 Аванс: {order.advance_payment.toFixed(2)} ₽
                                 {order.debt > 0 && ` | Долг: ${order.debt.toFixed(2)} ₽`}
@@ -239,7 +240,7 @@ export const Cabinet = () => {
                             <div className="text-2xl font-bold text-blue-600">
                               {order.total_price.toFixed(2)} ₽
                             </div>
-                            {order.advance_payment > 0 && (
+                            {order.advance_payment != null && (
                               <div className="text-xs text-gray-500 mt-1">
                                 Оплачено: {order.advance_payment.toFixed(2)} ₽
                               </div>
@@ -472,6 +473,9 @@ export const Cabinet = () => {
                                     )
                                   )}
                                 </div>
+                                {details.calculation.works && (
+                                  <WorksPanel works={details.calculation.works} className="mt-4" />
+                                )}
                                 <div className="mt-4 pt-4 border-t-2 border-gray-300">
                                   <div className="flex justify-between items-center">
                                     <span className="text-xl font-bold text-gray-800">Итого:</span>
@@ -515,7 +519,7 @@ export const Cabinet = () => {
                                         {details.total_price.toFixed(2)} ₽
                                       </span>
                                     </div>
-                                    {details.advance_payment > 0 && (
+                                    {details.advance_payment != null && (
                                       <div className="flex justify-between items-center mt-2">
                                         <span className="text-gray-600">Аванс:</span>
                                         <span className="font-semibold text-green-600">

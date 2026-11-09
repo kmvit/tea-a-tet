@@ -19,6 +19,10 @@ export const Summary = () => {
   }, [orderData.manual_complexity, orderData.quantity]);
 
   const handleCreateOrder = async () => {
+    if (orderData.advance_payment == null || orderData.advance_payment === '' || !Number.isFinite(Number(orderData.advance_payment)) || Number(orderData.advance_payment) < 0) {
+      navigate('/', { state: { step: 5 } });
+      return;
+    }
     setLoading(true);
     try {
       const dataToSend = {
@@ -28,6 +32,7 @@ export const Summary = () => {
         backing_id: (orderData.backings && orderData.backings[0]) || orderData.backing_id || null,
         backings: orderData.backings || [],
         foamboard_id: orderData.foamboard_id,
+        mount_count: orderData.mount_count || 0,
         stretch_id: orderData.stretch_id,
         hardware_id: orderData.hardware_id,
         hardware_quantity: orderData.hardware_quantity,
@@ -201,25 +206,6 @@ export const Summary = () => {
                 <p className="text-xs text-gray-500 mt-1">Заказ на N одинаковых изделий — вся стоимость умножается на количество</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Сложность (доп. сумма, ₽)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={orderData.manual_complexity ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    updateOrderData({ manual_complexity: v === '' ? null : parseFloat(v) });
-                  }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition"
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">Добавляется к итоговой стоимости полностью</p>
-              </div>
-
               <div className="border-t-2 border-gray-300 pt-4">
                 <div className="flex justify-between items-center">
                   <span className="text-2xl font-bold text-gray-800">Итого:</span>
@@ -241,7 +227,7 @@ export const Summary = () => {
                   <p><strong>Имя:</strong> {orderData.customer_name}</p>
                   <p><strong>Телефон:</strong> {orderData.customer_phone}</p>
                   <p><strong>Способ оплаты:</strong> {orderData.payment_method || 'наличные'}</p>
-                  {orderData.advance_payment && (
+                  {orderData.advance_payment != null && (
                     <p><strong>Аванс:</strong> {parseFloat(orderData.advance_payment).toFixed(2)} ₽</p>
                   )}
                 </div>
@@ -263,7 +249,7 @@ export const Summary = () => {
 
             <div className="flex space-x-4">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/', { state: { step: 5 } })}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition"
               >
                 Назад
