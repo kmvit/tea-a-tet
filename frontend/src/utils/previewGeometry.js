@@ -1,4 +1,10 @@
 // All dimensions use centimetres; x1/length is height, x2/width is width.
+export function baguetteWidthPixels(widthMeters, pixelsPerCm = 5) {
+  const meters = Number(widthMeters);
+  if (!Number.isFinite(meters) || meters <= 0) return 50;
+  return Math.max(1, Math.round(meters * 100 * pixelsPerCm));
+}
+
 export function previewGeometry(orderData) {
   const firstFrame = orderData.frames?.[0];
   const height = Number(firstFrame?.x1 ?? orderData.x1) || 30;

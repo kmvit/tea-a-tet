@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useOrder } from '../context/OrderContext';
-import { previewGeometry } from '../utils/previewGeometry';
+import { baguetteWidthPixels, previewGeometry } from '../utils/previewGeometry';
 
 const DEFAULT_FRAME_WIDTH = 50;
 const PASSEPARTOUT_COLOR = '#f5f5dc';
@@ -123,7 +123,7 @@ export const FramePreview = ({ showLabel = true }) => {
     const unit = 5;
     const iw = width * unit;
     const ih = height * unit;
-    const widths = layers.map((layer) => Number(layer.width) > 0 ? Number(layer.width) * unit : DEFAULT_FRAME_WIDTH);
+    const widths = layers.map((layer) => baguetteWidthPixels(layer.width, unit));
     const totalInset = widths.reduce((a, b) => a + b, 0);
     const outW = Math.ceil(iw + 2 * totalInset);
     const outH = Math.ceil(ih + 2 * totalInset);

@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { previewGeometry } from './previewGeometry.js';
+import { baguetteWidthPixels, previewGeometry } from './previewGeometry.js';
+
+test('baguette width in metres uses the same scale as mat dimensions in centimetres', () => {
+  assert.equal(baguetteWidthPixels('0.06'), 30);
+  assert.equal(baguetteWidthPixels('0.05'), 25);
+  assert.equal(baguetteWidthPixels(0.1), 50);
+  assert.equal(baguetteWidthPixels(0.001), 1);
+  assert.equal(baguetteWidthPixels(null), 50);
+  assert.equal(baguetteWidthPixels('invalid'), 50);
+});
 
 test('mat position follows window size regardless of selection order', () => {
   for (const ids of [[1, 2], [2, 1]]) {
